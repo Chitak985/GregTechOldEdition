@@ -1,0 +1,216 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group = 'dev.gtoe'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.ow2.asm:asm:9.8'
+    compileOnly 'org.lwjgl.lwjgl:lwjgl:2.9.3'
+}
+
+def generatedAgentResources = layout.buildDirectory.dir('generated/agent-resources')
+
+tasks.register('generateTerrainTexture') {
+    description = 'Generates the GTOE 19-texture terrain atlas.'
+    def outputFile = generatedAgentResources.map { it.file('gtoe-terrain.png') }
+    outputs.file(outputFile)
+
+    doLast {
+        File destination = outputFile.get().asFile
+        destination.parentFile.mkdirs()
+
+        def image = new java.awt.image.BufferedImage(
+            256, 256, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+
+        for (int y = 0; y < 256; y++) {
+            for (int x = 0; x < 256; x++) {
+                image.setRGB(x, y, 0xFFFF00FF as int)
+            }
+        }
+
+        int[] originalBaseColors = [
+            0xFF5A9F42, // 1: grass
+            0xFF79553A, // 2: dirt
+            0xFF81858A, // 3: stone
+            0xFF3F4852, // 4: deep stone
+            0xFF202124, // 5: bedrock
+            0xFFD8C58B, // 6: sand
+            0xFFA76243, // 7: clay
+            0xFFE4EDF1, // 8: snow
+            0xFF76552E, // 9: wood
+            0xFFB88952  // 10: planks
+        ] as int[]
+
+        // Preserve the existing generation algorithm for textures 1-10 exactly.
+        for (int tile = 0; tile < 10; tile++) {
+            int color = originalBaseColors[tile]
+            int baseR = (color >>> 16) & 255
+            int baseG = (color >>> 8) & 255
+            int baseB = color & 255
+
+            for (int py = 0; py < 16; py++) {
+                for (int px = 0; px < 16; px++) {
+                    int hash = (px * 37 + py * 61 + tile * 101 + px * py * 7)
+                    int variation = (hash & 31) - 15
+                    if (((px * 3 + py * 5 + tile) % 23) == 0) {
+                        variation -= 24
+                    } else if (((px * 7 + py * 2 + tile) % 29) == 0) {
+                        variation += 18
+                    }
+
+                    int red = Math.max(0, Math.min(255, baseR + variation))
+                    int green = Math.max(0, Math.min(255, baseG + variation))
+                    int blue = Math.max(0, Math.min(255, baseB + variation))
+                    int argb = (0xFF << 24) | (red << 16) | (green << 8) | blue
+                    image.setRGB(tile * 16 + px, py, argb)
+                }
+            }
+        }
+
+        def atlasPixel = { int blockId, int px, int py, int argb ->
+            int slot = blockId - 1
+            int atlasX = (slot % 16) * 16 + px
+            int atlasY = ((int) (slot / 16)) * 16 + py
+            image.setRGB(atlasX, atlasY, argb)
+        }
+
+        def casing = { int blockId, int base, int light, int dark ->
+            for (int py = 0; py < 16; py++) {
+                for (int px = 0; px < 16; px++) {
+                    int color = base
+                    if (px == 0 || py == 0 || px == 15 || py == 15) {
+                        color = dark
+                    } else if (px == 1 || py == 1 || px == 14 || py == 14) {
+                        color = light
+                    } else if (px == 4 || px == 11 || py == 4 || py == 11) {
+                        color = ((px + py) & 1) == 0 ? dark : base
+                    } else if (((px * 13 + py * 7 + blockId) & 15) == 0) {
+                        color = light
+                    }
+                    if ((px == 2 || px == 13) && (py == 2 || py == 13)) {
+                        color = 0xFFE5D08A as int
+                    }
+                    atlasPixel(blockId, px, py, color)
+                }
+            }
+        }
+
+        def ore = { int blockId, int oreColor, int oreHighlight ->
+            for (int py = 0; py < 16; py++) {
+                for (int px = 0; px < 16; px++) {
+                    int noise = ((px * 37 + py * 61 + px * py * 7) & 31) - 15
+                    int gray = Math.max(40, Math.min(190, 126 + noise))
+                    int color = (0xFF << 24) | (gray << 16) | (gray << 8) | gray
+                    int vein = (px * 5 + py * 3 + blockId * 7) % 17
+                    if (vein == 0 || vein == 1 || (px > 2 && py > 2 && ((px + py * 2) % 19 == 0))) {
+                        color = ((px + py) & 1) == 0 ? oreColor : oreHighlight
+                    }
+                    atlasPixel(blockId, px, py, color)
+                }
+            }
+        }
+
+        casing(11, 0xFF9B6338 as int, 0xFFD39A5E as int, 0xFF4F2D1B as int) // bronze
+        casing(12, 0xFF747B82 as int, 0xFFB8C0C7 as int, 0xFF343A40 as int) // steel
+        casing(13, 0xFFBBC2C7 as int, 0xFFF1F4F5 as int, 0xFF687078 as int) // aluminium
+        casing(14, 0xFF91A8AC as int, 0xFFD7E8E8 as int, 0xFF455D63 as int) // stainless steel
+        ore(15, 0xFFB86A35 as int, 0xFFE79A5A as int) // copper
+        ore(16, 0xFFB99A7A as int, 0xFFE1C7A7 as int) // iron
+        ore(17, 0xFF202226 as int, 0xFF4A4D52 as int) // coal
+        ore(18, 0xFFC8D1D5 as int, 0xFFF2F7F8 as int) // tin
+
+        // Machine: a steel casing with a small pixel display on the shared face texture.
+        casing(19, 0xFF69737B as int, 0xFFAEB9C0 as int, 0xFF303941 as int)
+        for (int py = 5; py <= 10; py++) {
+            for (int px = 4; px <= 11; px++) {
+                int color = 0xFF10191D as int
+                if (px >= 5 && px <= 10 && py >= 6 && py <= 9) {
+                    color = ((px + py) % 3 == 0) ? 0xFF79F2E0 as int : 0xFF2B7F84 as int
+                }
+                atlasPixel(19, px, py, color)
+            }
+        }
+
+        javax.imageio.ImageIO.write(image, 'png', destination)
+    }
+}
+
+sourceSets.main.resources.srcDir(generatedAgentResources)
+
+tasks.named('processResources') {
+    dependsOn tasks.named('generateTerrainTexture')
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 8
+}
+
+tasks.named('jar') {
+    enabled = false
+}
+
+tasks.named('shadowJar') {
+    archiveBaseName = 'gtoe'
+    archiveClassifier = ''
+    archiveVersion = ''
+
+    relocate 'org.objectweb.asm', 'dev.gtoe.internal.asm'
+
+    manifest {
+        attributes(
+            'Premain-Class': 'dev.gtoe.agent.GtoeAgent',
+            'Can-Redefine-Classes': 'false',
+            'Can-Retransform-Classes': 'false'
+        )
+    }
+}
+
+tasks.register('verifyTransformer', JavaExec) {
+    group = 'verification'
+    description = 'Verifies the RubyDung init bytecode injection using an ASM-generated fixture.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.gtoe.agent.TransformerVerification'
+}
+
+tasks.register('verifyInstalledGame', JavaExec) {
+    group = 'verification'
+    description = 'Structurally verifies transformations against an installed rd-132211 client JAR.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.gtoe.agent.InstalledGameVerification'
+
+    doFirst {
+        def gameJar = providers.gradleProperty('gameJar').orNull
+        if (gameJar == null || gameJar.trim().isEmpty()) {
+            throw new GradleException('Supply -PgameJar=C:\\path\\to\\minecraft-rd-132211-client.jar')
+        }
+        args = [gameJar]
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyTransformer')
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.named('shadowJar')
+}
+
+tasks.named('wrapper') {
+    gradleVersion = '8.8'
+    distributionType = Wrapper.DistributionType.BIN
+}
