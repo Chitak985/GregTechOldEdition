@@ -2,6 +2,10 @@ package dev.gtoe.agent;
 
 import org.lwjgl.opengl.GL11;
 
+// Should be temporary as well until inventory is moved somewhere else
+import java.util.ArrayList;
+import java.util.List;
+
 /** Minimal fixed-function pixel-text overlay for the selected block. */
 public final class HudOverlay {
     private static final int GL_ALL_ATTRIB_BITS = 0x000FFFFF;
@@ -10,15 +14,39 @@ public final class HudOverlay {
     private HudOverlay() {
     }
 
+    // TEMPORARY LOCATION FOR FUNCTION
+    // This needs to be global and easily accessible
+    public static String itemName(int itemId) {
+        // Items 0-99 are blocks, so they can use the block name function
+        if (itemId <= 99) {
+            return blockName(itemId);
+        }
+        // Everything else are items, not blocks
+        switch (itemId) {
+            case 100:
+                return "Stick";
+            case 101:
+                return "Copper Ingot";
+            case 102:
+                return "Iron Ingot";
+            case 103:
+                return "Coal";
+            case 104:
+                return "Tin Ingot";
+            case 105:
+                return "Bronze Ingot";
+            default:
+                return "Unknown Item";
+        }
+    }
+
     public static void render(int screenWidth, int screenHeight) {
         if (disabled || screenWidth <= 0 || screenHeight <= 0) {
             return;
         }
 
         try {
-            String text = "GTOE BLOCK " + BlockSelection.selectedBlockId()
-                    + " " + BlockSelection.selectedBlockName().toUpperCase();
-
+            // Setup display
             GL11.glPushAttrib(GL_ALL_ATTRIB_BITS);
             GL11.glMatrixMode(GL11.GL_PROJECTION);
             GL11.glPushMatrix();
@@ -27,15 +55,30 @@ public final class HudOverlay {
             GL11.glMatrixMode(GL11.GL_MODELVIEW);
             GL11.glPushMatrix();
             GL11.glLoadIdentity();
-
             GL11.glDisable(GL11.GL_TEXTURE_2D);
             GL11.glDisable(GL11.GL_DEPTH_TEST);
             GL11.glDisable(GL11.GL_CULL_FACE);
             GL11.glDisable(GL11.GL_FOG);
 
-            drawString(text, 5, 5, 2, 0.08f, 0.08f, 0.08f);
-            drawString(text, 4, 4, 2, 0.93f, 0.93f, 0.93f);
+            // Draw block indicator
+            drawTextNormal(
+                "BLOCK " + BlockSelection.selectedBlockName().toUpperCase(), 
+            4, 4);
 
+            // TEMPORARY LOGIC
+            List<int> inventory = new ArrayList<int>();  // This needs to be stored globally somewhere
+            inventory.add(2);  // How to add an item, in this case dirt
+
+            // Draw inventory
+            int tmpY = 20;
+            for (String item : inventory) {
+                drawTextNormal(
+                    item,
+                4, tmpY)
+                tmpY += 16
+            }
+
+            // Finish setting up display
             GL11.glPopMatrix();
             GL11.glMatrixMode(GL11.GL_PROJECTION);
             GL11.glPopMatrix();
@@ -46,6 +89,17 @@ public final class HudOverlay {
             System.err.println("[gtoe] Disabling block overlay after a rendering error");
             error.printStackTrace(System.err);
         }
+    }
+
+    private static void drawTextNormal(
+            String text, int startX, int startY) {
+        drawTextShadowed(text, startX, startY, 2, 0.93f, 0.93f, 0.93f);
+    }
+
+    private static void drawTextShadowed(
+            String text, int startX, int startY, int scale, float red, float green, float blue) {
+            drawString(text, startX+1, startY+1, scale, 0.08f, 0.08f, 0.08f);
+            drawString(text, startX, startY, scale, red, green, blue);
     }
 
     private static void drawString(
