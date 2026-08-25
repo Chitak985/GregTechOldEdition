@@ -13,6 +13,9 @@ public final class BlockSelection {
 
     /** Receives LWJGL 2 keyboard events from the transformed RubyDung render loop. */
     public static void handleKeyEvent(int keyCode, boolean pressed, boolean shifted) {
+        if (GuiManager.handleKeyEvent(keyCode, pressed)) {
+            return;
+        }
         if (!pressed) {
             return;
         }
@@ -31,48 +34,7 @@ public final class BlockSelection {
     }
 
     public static String blockName(int blockId) {
-        switch (blockId) {
-            case 1:
-                return "Grass";
-            case 2:
-                return "Dirt";
-            case 3:
-                return "Stone";
-            case 4:
-                return "Deep Stone";
-            case 5:
-                return "Bedrock";
-            case 6:
-                return "Sand";
-            case 7:
-                return "Clay";
-            case 8:
-                return "Snow";
-            case 9:
-                return "Wood";
-            case 10:
-                return "Planks";
-            case 11:
-                return "Bronze Casing";
-            case 12:
-                return "Steel Casing";
-            case 13:
-                return "Aluminium Casing";
-            case 14:
-                return "Stainless Steel Casing";
-            case 15:
-                return "Copper Ore";
-            case 16:
-                return "Iron Ore";
-            case 17:
-                return "Coal Ore";
-            case 18:
-                return "Tin Ore";
-            case 19:
-                return "Machine";
-            default:
-                return "Unknown";
-        }
+        return ItemCatalog.blockName(blockId);
     }
 
     private static int blockIdForKey(int keyCode, boolean shifted) {

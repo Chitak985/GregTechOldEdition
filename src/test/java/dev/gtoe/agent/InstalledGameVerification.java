@@ -31,6 +31,7 @@ public final class InstalledGameVerification {
 
         GtoeTransformer transformer = new GtoeTransformer();
         verifyRubyDung(transform(transformer, gameJar, GtoeTransformer.RUBY_DUNG));
+        verifyPlayer(transform(transformer, gameJar, GtoeTransformer.PLAYER));
         verifyLevel(transform(transformer, gameJar, GtoeTransformer.LEVEL));
         verifyTile(transform(transformer, gameJar, GtoeTransformer.TILE));
         verifyChunk(transform(transformer, gameJar, GtoeTransformer.CHUNK));
@@ -51,7 +52,12 @@ public final class InstalledGameVerification {
         final boolean[] messageFound = {false};
         final boolean[] keyboardSelectionFound = {false};
         final boolean[] selectedPlacementFound = {false};
+        final boolean[] breakActionFound = {false};
+        final boolean[] placeActionFound = {false};
+        final boolean[] mouseGuiInputFound = {false};
         final boolean[] hudFound = {false};
+        final int[] filteredMouseDeltas = {0};
+        final int[] originalSetTileCalls = {0};
         new ClassReader(bytecode).accept(new ClassVisitor(Opcodes.ASM9) {
             @Override
             public MethodVisitor visitMethod(
@@ -79,6 +85,35 @@ public final class InstalledGameVerification {
                             selectedPlacementFound[0] = true;
                         }
                         if (opcode == Opcodes.INVOKESTATIC
+                                && "dev/gtoe/agent/WorldActions".equals(owner)
+                                && "breakBlockOrInteract".equals(methodName)
+                                && "(Ljava/lang/Object;III)V".equals(methodDescriptor)) {
+                            breakActionFound[0] = true;
+                        }
+                        if (opcode == Opcodes.INVOKESTATIC
+                                && "dev/gtoe/agent/WorldActions".equals(owner)
+                                && "placeSelectedBlock".equals(methodName)
+                                && "(Ljava/lang/Object;IIII)V".equals(methodDescriptor)) {
+                            placeActionFound[0] = true;
+                        }
+                        if (opcode == Opcodes.INVOKESTATIC
+                                && "dev/gtoe/agent/GuiManager".equals(owner)
+                                && "handleMouseEvent".equals(methodName)
+                                && "(IIIZIII)V".equals(methodDescriptor)) {
+                            mouseGuiInputFound[0] = true;
+                        }
+                        if (opcode == Opcodes.INVOKESTATIC
+                                && "dev/gtoe/agent/GuiManager".equals(owner)
+                                && "filterMouseDelta".equals(methodName)
+                                && "(I)I".equals(methodDescriptor)) {
+                            filteredMouseDeltas[0]++;
+                        }
+                        if (opcode == Opcodes.INVOKEVIRTUAL
+                                && GtoeTransformer.LEVEL.equals(owner)
+                                && "setTile".equals(methodName)) {
+                            originalSetTileCalls[0]++;
+                        }
+                        if (opcode == Opcodes.INVOKESTATIC
                                 && "dev/gtoe/agent/HudOverlay".equals(owner)
                                 && "render".equals(methodName)
                                 && "(II)V".equals(methodDescriptor)) {
@@ -91,7 +126,44 @@ public final class InstalledGameVerification {
         require(messageFound[0], "RubyDung.init()V does not contain the injected message");
         require(keyboardSelectionFound[0], "RubyDung does not forward number-key events");
         require(selectedPlacementFound[0], "RubyDung placement does not use the selected block ID");
+        require(breakActionFound[0], "RubyDung breaking is not routed through inventory actions");
+        require(placeActionFound[0], "RubyDung placement is not routed through inventory actions");
+        require(mouseGuiInputFound[0], "RubyDung does not forward GUI mouse events");
+        require(filteredMouseDeltas[0] == 2, "RubyDung camera motion is not paused for GUIs");
+        require(originalSetTileCalls[0] == 0, "RubyDung still changes blocks outside inventory actions");
         require(hudFound[0], "RubyDung does not render the top-left block overlay");
+    }
+
+    private static void verifyPlayer(byte[] bytecode) {
+        final int[] guiKeyboardPolls = {0};
+        final int[] originalKeyboardPolls = {0};
+        new ClassReader(bytecode).accept(new ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public MethodVisitor visitMethod(
+                    int access, String name, String descriptor, String signature, String[] exceptions) {
+                if (!"tick".equals(name) || !"()V".equals(descriptor)) {
+                    return null;
+                }
+                return new MethodVisitor(Opcodes.ASM9) {
+                    @Override
+                    public void visitMethodInsn(
+                            int opcode, String owner, String name, String descriptor, boolean isInterface) {
+                        if (opcode == Opcodes.INVOKESTATIC
+                                && "dev/gtoe/agent/GuiManager".equals(owner)
+                                && "isGameplayKeyDown".equals(name)) {
+                            guiKeyboardPolls[0]++;
+                        }
+                        if (opcode == Opcodes.INVOKESTATIC
+                                && "org/lwjgl/input/Keyboard".equals(owner)
+                                && "isKeyDown".equals(name)) {
+                            originalKeyboardPolls[0]++;
+                        }
+                    }
+                };
+            }
+        }, 0);
+        require(guiKeyboardPolls[0] > 0, "Player movement is not routed through GUI-aware input");
+        require(originalKeyboardPolls[0] == 0, "Player still polls movement keys while GUIs are open");
     }
 
     private static void verifyLevel(byte[] bytecode) {

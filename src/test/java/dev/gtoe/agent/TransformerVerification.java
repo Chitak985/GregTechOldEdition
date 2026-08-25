@@ -58,7 +58,98 @@ public final class TransformerVerification {
         require("Machine".equals(BlockSelection.selectedBlockName()),
                 "Block ID 19 should be named Machine");
 
-        System.out.println("Transformer verification passed: layers and number-key selection are correct");
+        verifyInventoryAndRecipes();
+
+        System.out.println("Transformer verification passed: inventory, recipes, input, and world actions are correct");
+    }
+
+    private static void verifyInventoryAndRecipes() {
+        Inventory.clearForTests();
+        GuiManager.resetForTests();
+        WorldActions.resetForTests();
+
+        FakeLevel level = new FakeLevel();
+        level.setTile(1, 1, 1, 2);
+        WorldActions.breakBlockOrInteract(level, 1, 1, 1);
+        require(level.gtoe$getBlockId(1, 1, 1) == 0, "Breaking should remove the block");
+        require(Inventory.count(2) == 1, "Breaking dirt should add one dirt block");
+
+        WorldActions.placeSelectedBlock(level, 2, 1, 1, 2);
+        require(level.gtoe$getBlockId(2, 1, 1) == 2, "Owned dirt should be placeable");
+        require(Inventory.count(2) == 0, "Successful placement should consume one dirt block");
+
+        WorldActions.placeSelectedBlock(level, 3, 1, 1, 2);
+        require(level.gtoe$getBlockId(3, 1, 1) == 0,
+                "Placement without the selected block must be rejected");
+
+        require(Arrays.equals(
+                        GuiManager.recipeFor(new int[] {9, -1, -1, -1}),
+                        new int[] {10, 2}),
+                "One wood anywhere should craft two planks");
+        require(Arrays.equals(
+                        GuiManager.recipeFor(new int[] {-1, 10, -1, 10}),
+                        new int[] {100, 2}),
+                "Two vertical planks should craft two sticks");
+        require(Arrays.equals(
+                        GuiManager.recipeFor(new int[] {10, 10, -1, -1}),
+                        new int[] {-1, 0}),
+                "Horizontal planks must not match the stick recipe");
+        require("Stick".equals(ItemCatalog.itemName(100)), "Item ID 100 should be Stick");
+
+        // Exercise the real drag/release/output-click flow at the 1024x768 game size.
+        Inventory.add(ItemCatalog.WOOD_BLOCK_ID, 1);
+        GuiManager.handleKeyEvent(18, true);
+        drag(410, 442, 440, 320); // Inventory wood -> upper-left crafting slot.
+        click(530, 332); // Output: two planks.
+        require(Inventory.count(ItemCatalog.WOOD_BLOCK_ID) == 0,
+                "Crafting planks should consume one wood");
+        require(Inventory.count(ItemCatalog.PLANKS_BLOCK_ID) == 2,
+                "Crafting wood should produce two planks");
+
+        drag(410, 442, 440, 320); // First plank -> upper-left.
+        drag(410, 442, 440, 352); // Second plank -> lower-left.
+        click(530, 332); // Output: two sticks.
+        require(Inventory.count(ItemCatalog.PLANKS_BLOCK_ID) == 0,
+                "Crafting sticks should consume two vertical planks");
+        require(Inventory.count(ItemCatalog.STICK_ITEM_ID) == 2,
+                "Two vertical planks should produce two sticks");
+        GuiManager.handleKeyEvent(18, true);
+
+        int selectionBeforeGui = BlockSelection.selectedBlockId();
+        BlockSelection.handleKeyEvent(18, true, false);
+        require(GuiManager.isOpen(), "E should open crafting");
+        BlockSelection.handleKeyEvent(2, true, false);
+        require(BlockSelection.selectedBlockId() == selectionBeforeGui,
+                "Number keys must not change selection while a GUI is open");
+        BlockSelection.handleKeyEvent(18, true, false);
+        require(!GuiManager.isOpen(), "E should close crafting");
+
+        require(BlockGuiRegistry.openForBlock(ItemCatalog.PLANKS_BLOCK_ID),
+                "Planks should be registered with the reusable block GUI system");
+        // Screen-space button point (450,340), converted back to LWJGL's bottom-left Y.
+        GuiManager.handleMouseEvent(450, 427, 0, true, 0, 1024, 768);
+        require(!GuiManager.isOpen(), "The reusable simple-GUI button should close its window");
+        require(GuiManager.blocksWorldAction(),
+                "A GUI close click must not fall through to world placement");
+
+        Inventory.clearForTests();
+        GuiManager.resetForTests();
+        WorldActions.resetForTests();
+    }
+
+    private static void drag(int fromX, int fromY, int toX, int toY) {
+        mouse(fromX, fromY, true);
+        mouse(toX, toY, false);
+    }
+
+    private static void click(int x, int y) {
+        mouse(x, y, true);
+        mouse(x, y, false);
+    }
+
+    private static void mouse(int screenX, int screenY, boolean pressed) {
+        GuiManager.handleMouseEvent(
+                screenX, 768 - 1 - screenY, 0, pressed, 0, 1024, 768);
     }
 
     private static byte[] createFixture() {
@@ -70,6 +161,8 @@ public final class TransformerVerification {
                 null,
                 "java/lang/Object",
                 null);
+        writer.visitField(Opcodes.ACC_PRIVATE, "width", "I", null, null).visitEnd();
+        writer.visitField(Opcodes.ACC_PRIVATE, "height", "I", null, null).visitEnd();
 
         MethodVisitor method = writer.visitMethod(
                 Opcodes.ACC_PUBLIC,
@@ -91,6 +184,37 @@ public final class TransformerVerification {
                 null,
                 null);
         render.visitCode();
+
+        render.visitMethodInsn(
+                Opcodes.INVOKESTATIC,
+                "org/lwjgl/input/Mouse",
+                "getDX",
+                "()I",
+                false);
+        render.visitInsn(Opcodes.POP);
+        render.visitMethodInsn(
+                Opcodes.INVOKESTATIC,
+                "org/lwjgl/input/Mouse",
+                "getDY",
+                "()I",
+                false);
+        render.visitInsn(Opcodes.POP);
+
+        // The real mouse loop reads the event button twice.
+        render.visitMethodInsn(
+                Opcodes.INVOKESTATIC,
+                "org/lwjgl/input/Mouse",
+                "getEventButton",
+                "()I",
+                false);
+        render.visitInsn(Opcodes.POP);
+        render.visitMethodInsn(
+                Opcodes.INVOKESTATIC,
+                "org/lwjgl/input/Mouse",
+                "getEventButton",
+                "()I",
+                false);
+        render.visitInsn(Opcodes.POP);
 
         // Removal call: setTile(0, 0, 0, 0).
         render.visitInsn(Opcodes.ACONST_NULL);
@@ -137,6 +261,19 @@ public final class TransformerVerification {
 
         writer.visitEnd();
         return writer.toByteArray();
+    }
+
+    /** Reflection-compatible stand-in; it is test code, not a copied game class. */
+    public static final class FakeLevel {
+        private final int[][][] blocks = new int[4][4][4];
+
+        public int gtoe$getBlockId(int x, int y, int z) {
+            return blocks[x][y][z];
+        }
+
+        public void setTile(int x, int y, int z, int blockId) {
+            blocks[x][y][z] = blockId;
+        }
     }
 
     private static List<String> readInitialInstructions(byte[] bytecode) {

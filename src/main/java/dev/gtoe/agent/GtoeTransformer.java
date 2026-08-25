@@ -16,6 +16,7 @@ final class GtoeTransformer implements ClassFileTransformer {
     static final String LEVEL = "com/mojang/rubydung/level/Level";
     static final String TILE = "com/mojang/rubydung/level/Tile";
     static final String CHUNK = "com/mojang/rubydung/level/Chunk";
+    static final String PLAYER = "com/mojang/rubydung/Player";
 
     static final String INIT_MESSAGE = "[gtoe] RubyDung.init() entered";
     static final String TILE_ARRAY_FIELD = "gtoe$tiles";
@@ -25,6 +26,8 @@ final class GtoeTransformer implements ClassFileTransformer {
     private static final String TERRAIN_LAYERS = "dev/gtoe/agent/TerrainLayers";
     private static final String BLOCK_SELECTION = "dev/gtoe/agent/BlockSelection";
     private static final String HUD_OVERLAY = "dev/gtoe/agent/HudOverlay";
+    private static final String GUI_MANAGER = "dev/gtoe/agent/GuiManager";
+    private static final String WORLD_ACTIONS = "dev/gtoe/agent/WorldActions";
 
     @Override
     public byte[] transform(
@@ -46,6 +49,9 @@ final class GtoeTransformer implements ClassFileTransformer {
             if (CHUNK.equals(className)) {
                 return transformChunk(classfileBuffer);
             }
+            if (PLAYER.equals(className)) {
+                return transformPlayer(classfileBuffer);
+            }
             return null;
         } catch (Throwable error) {
             System.err.println("[gtoe] Transformation failed for " + className
@@ -60,9 +66,13 @@ final class GtoeTransformer implements ClassFileTransformer {
         ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_MAXS);
         final boolean[] injected = {false};
         final boolean[] keyboardPatched = {false};
+        final boolean[] breakPatched = {false};
         final boolean[] placementPatched = {false};
         final boolean[] hudPatched = {false};
+        final boolean[] mouseEventPatched = {false};
         final int[] setTileCalls = {0};
+        final int[] mouseButtonCalls = {0};
+        final int[] mouseDeltaCalls = {0};
 
         reader.accept(new ClassVisitor(Opcodes.ASM9, writer) {
             @Override
@@ -87,6 +97,72 @@ final class GtoeTransformer implements ClassFileTransformer {
                                 String methodName,
                                 String methodDescriptor,
                                 boolean isInterface) {
+                            if (opcode == Opcodes.INVOKESTATIC
+                                    && "org/lwjgl/input/Mouse".equals(owner)
+                                    && ("getDX".equals(methodName) || "getDY".equals(methodName))
+                                    && "()I".equals(methodDescriptor)) {
+                                super.visitMethodInsn(
+                                        opcode, owner, methodName, methodDescriptor, isInterface);
+                                super.visitMethodInsn(
+                                        Opcodes.INVOKESTATIC,
+                                        GUI_MANAGER,
+                                        "filterMouseDelta",
+                                        "(I)I",
+                                        false);
+                                mouseDeltaCalls[0]++;
+                                return;
+                            }
+
+                            if (opcode == Opcodes.INVOKESTATIC
+                                    && "org/lwjgl/input/Mouse".equals(owner)
+                                    && "getEventButton".equals(methodName)
+                                    && "()I".equals(methodDescriptor)) {
+                                mouseButtonCalls[0]++;
+                                if (mouseButtonCalls[0] == 1) {
+                                    super.visitMethodInsn(
+                                            Opcodes.INVOKESTATIC,
+                                            "org/lwjgl/input/Mouse",
+                                            "getEventX",
+                                            "()I",
+                                            false);
+                                    super.visitMethodInsn(
+                                            Opcodes.INVOKESTATIC,
+                                            "org/lwjgl/input/Mouse",
+                                            "getEventY",
+                                            "()I",
+                                            false);
+                                    super.visitMethodInsn(
+                                            Opcodes.INVOKESTATIC,
+                                            "org/lwjgl/input/Mouse",
+                                            "getEventButton",
+                                            "()I",
+                                            false);
+                                    super.visitMethodInsn(
+                                            Opcodes.INVOKESTATIC,
+                                            "org/lwjgl/input/Mouse",
+                                            "getEventButtonState",
+                                            "()Z",
+                                            false);
+                                    super.visitMethodInsn(
+                                            Opcodes.INVOKESTATIC,
+                                            "org/lwjgl/input/Mouse",
+                                            "getEventDWheel",
+                                            "()I",
+                                            false);
+                                    super.visitVarInsn(Opcodes.ALOAD, 0);
+                                    super.visitFieldInsn(Opcodes.GETFIELD, RUBY_DUNG, "width", "I");
+                                    super.visitVarInsn(Opcodes.ALOAD, 0);
+                                    super.visitFieldInsn(Opcodes.GETFIELD, RUBY_DUNG, "height", "I");
+                                    super.visitMethodInsn(
+                                            Opcodes.INVOKESTATIC,
+                                            GUI_MANAGER,
+                                            "handleMouseEvent",
+                                            "(IIIZIII)V",
+                                            false);
+                                    mouseEventPatched[0] = true;
+                                }
+                            }
+
                             if (opcode == Opcodes.INVOKESTATIC
                                     && "org/lwjgl/input/Keyboard".equals(owner)
                                     && "getEventKey".equals(methodName)
@@ -132,6 +208,17 @@ final class GtoeTransformer implements ClassFileTransformer {
                                     && "setTile".equals(methodName)
                                     && "(IIII)V".equals(methodDescriptor)) {
                                 setTileCalls[0]++;
+                                if (setTileCalls[0] == 1) {
+                                    super.visitInsn(Opcodes.POP);
+                                    super.visitMethodInsn(
+                                            Opcodes.INVOKESTATIC,
+                                            WORLD_ACTIONS,
+                                            "breakBlockOrInteract",
+                                            "(Ljava/lang/Object;III)V",
+                                            false);
+                                    breakPatched[0] = true;
+                                    return;
+                                }
                                 if (setTileCalls[0] == 2) {
                                     super.visitInsn(Opcodes.POP);
                                     super.visitMethodInsn(
@@ -140,7 +227,14 @@ final class GtoeTransformer implements ClassFileTransformer {
                                             "selectedBlockId",
                                             "()I",
                                             false);
+                                    super.visitMethodInsn(
+                                            Opcodes.INVOKESTATIC,
+                                            WORLD_ACTIONS,
+                                            "placeSelectedBlock",
+                                            "(Ljava/lang/Object;IIII)V",
+                                            false);
                                     placementPatched[0] = true;
+                                    return;
                                 }
                             }
 
@@ -191,10 +285,66 @@ final class GtoeTransformer implements ClassFileTransformer {
 
         require(injected[0], "RubyDung.init()V was not found");
         require(keyboardPatched[0], "RubyDung.render(F)V keyboard event loop was not recognized");
-        require(placementPatched[0] && setTileCalls[0] == 2,
-                "RubyDung.render(F)V placement call was not recognized");
+        require(breakPatched[0] && placementPatched[0] && setTileCalls[0] == 2,
+                "RubyDung.render(F)V break/place calls were not recognized");
+        require(mouseEventPatched[0] && mouseButtonCalls[0] == 2,
+                "RubyDung.render(F)V mouse event loop was not recognized");
+        require(mouseDeltaCalls[0] == 2,
+                "RubyDung.render(F)V mouse camera deltas were not recognized");
         require(hudPatched[0], "RubyDung.render(F)V display update was not recognized");
-        System.out.println("[gtoe] Added init logging, block selection, and HUD to RubyDung");
+        System.out.println("[gtoe] Added inventory-aware actions, GUI input, block selection, and HUD to RubyDung");
+        return writer.toByteArray();
+    }
+
+    private static byte[] transformPlayer(byte[] classfileBuffer) {
+        ClassReader reader = new ClassReader(classfileBuffer);
+        ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_MAXS);
+        final int[] keyboardPolls = {0};
+
+        reader.accept(new ClassVisitor(Opcodes.ASM9, writer) {
+            @Override
+            public MethodVisitor visitMethod(
+                    int access,
+                    String name,
+                    String descriptor,
+                    String signature,
+                    String[] exceptions) {
+                MethodVisitor delegate = super.visitMethod(
+                        access, name, descriptor, signature, exceptions);
+                if (!"tick".equals(name) || !"()V".equals(descriptor)) {
+                    return delegate;
+                }
+
+                return new MethodVisitor(Opcodes.ASM9, delegate) {
+                    @Override
+                    public void visitMethodInsn(
+                            int opcode,
+                            String owner,
+                            String methodName,
+                            String methodDescriptor,
+                            boolean isInterface) {
+                        if (opcode == Opcodes.INVOKESTATIC
+                                && "org/lwjgl/input/Keyboard".equals(owner)
+                                && "isKeyDown".equals(methodName)
+                                && "(I)Z".equals(methodDescriptor)) {
+                            super.visitMethodInsn(
+                                    Opcodes.INVOKESTATIC,
+                                    GUI_MANAGER,
+                                    "isGameplayKeyDown",
+                                    "(I)Z",
+                                    false);
+                            keyboardPolls[0]++;
+                            return;
+                        }
+                        super.visitMethodInsn(
+                                opcode, owner, methodName, methodDescriptor, isInterface);
+                    }
+                };
+            }
+        }, 0);
+
+        require(keyboardPolls[0] > 0, "Player.tick()V keyboard polling was not recognized");
+        System.out.println("[gtoe] Paused player keyboard movement while a GUI is open");
         return writer.toByteArray();
     }
 

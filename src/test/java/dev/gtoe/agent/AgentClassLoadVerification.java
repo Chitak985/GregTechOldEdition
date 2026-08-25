@@ -9,6 +9,7 @@ public final class AgentClassLoadVerification {
         ClassLoader loader = AgentClassLoadVerification.class.getClassLoader();
         String[] classes = {
             "com.mojang.rubydung.RubyDung",
+            "com.mojang.rubydung.Player",
             "com.mojang.rubydung.level.Level",
             "com.mojang.rubydung.level.Tile",
             "com.mojang.rubydung.level.Chunk"
