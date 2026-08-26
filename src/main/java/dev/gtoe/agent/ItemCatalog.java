@@ -3,9 +3,6 @@ package dev.gtoe.agent;
 /** Shared item/block identity rules. Block IDs occupy 0-99; ordinary items start at 100. */
 public final class ItemCatalog {
     public static final int FIRST_ITEM_ID = 100;
-    public static final int WOOD_BLOCK_ID = 9;
-    public static final int PLANKS_BLOCK_ID = 10;
-    public static final int STICK_ITEM_ID = 100;
 
     private ItemCatalog() {
     }
@@ -20,20 +17,13 @@ public final class ItemCatalog {
         }
 
         switch (itemId) {
-            case STICK_ITEM_ID:
-                return "Stick";
-            case 101:
-                return "Copper Ingot";
-            case 102:
-                return "Iron Ingot";
-            case 103:
-                return "Coal";
-            case 104:
-                return "Tin Ingot";
-            case 105:
-                return "Bronze Ingot";
-            default:
-                return "Unknown Item";
+            case 100: return "Stick";
+            case 101: return "Copper Ingot";
+            case 102: return "Iron Ingot";
+            case 103: return "Coal";
+            case 104: return "Tin Ingot";
+            case 105: return "Bronze Ingot";
+            default: return "Unknown Item";
         }
     }
 
@@ -48,8 +38,8 @@ public final class ItemCatalog {
             case 6: return "Sand";
             case 7: return "Clay";
             case 8: return "Snow";
-            case WOOD_BLOCK_ID: return "Wood";
-            case PLANKS_BLOCK_ID: return "Planks";
+            case 9: return "Wood";
+            case 10: return "Planks";
             case 11: return "Bronze Casing";
             case 12: return "Steel Casing";
             case 13: return "Aluminium Casing";
