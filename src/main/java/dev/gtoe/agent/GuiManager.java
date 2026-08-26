@@ -197,22 +197,22 @@ public final class GuiManager {
             if (itemId >= 0) {
                 occupied++;
             }
-            if (itemId == ItemCatalog.WOOD_BLOCK_ID) {
+            if (itemId == ItemCatalog.9) {
                 wood++;
             }
         }
         if (occupied == 1 && wood == 1) {
-            return new int[] {ItemCatalog.PLANKS_BLOCK_ID, 2};
+            return new int[] {10, 2};
         }
 
-        boolean leftColumn = grid[0] == ItemCatalog.PLANKS_BLOCK_ID
-                && grid[2] == ItemCatalog.PLANKS_BLOCK_ID
+        boolean leftColumn = grid[0] == 10
+                && grid[2] == 10
                 && grid[1] < 0 && grid[3] < 0;
-        boolean rightColumn = grid[1] == ItemCatalog.PLANKS_BLOCK_ID
-                && grid[3] == ItemCatalog.PLANKS_BLOCK_ID
+        boolean rightColumn = grid[1] == 10
+                && grid[3] == 10
                 && grid[0] < 0 && grid[2] < 0;
         if (leftColumn || rightColumn) {
-            return new int[] {ItemCatalog.STICK_ITEM_ID, 2};
+            return new int[] {100, 2};
         }
 
         return new int[] {-1, 0};
