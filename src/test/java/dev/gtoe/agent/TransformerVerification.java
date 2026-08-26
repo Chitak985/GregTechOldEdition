@@ -97,21 +97,21 @@ public final class TransformerVerification {
         require("Stick".equals(ItemCatalog.itemName(100)), "Item ID 100 should be Stick");
 
         // Exercise the real drag/release/output-click flow at the 1024x768 game size.
-        Inventory.add(ItemCatalog.WOOD_BLOCK_ID, 1);
+        Inventory.add(9, 1);
         GuiManager.handleKeyEvent(18, true);
         drag(410, 442, 440, 320); // Inventory wood -> upper-left crafting slot.
         click(530, 332); // Output: two planks.
-        require(Inventory.count(ItemCatalog.WOOD_BLOCK_ID) == 0,
+        require(Inventory.count(9) == 0,
                 "Crafting planks should consume one wood");
-        require(Inventory.count(ItemCatalog.PLANKS_BLOCK_ID) == 2,
+        require(Inventory.count(10) == 2,
                 "Crafting wood should produce two planks");
 
         drag(410, 442, 440, 320); // First plank -> upper-left.
         drag(410, 442, 440, 352); // Second plank -> lower-left.
         click(530, 332); // Output: two sticks.
-        require(Inventory.count(ItemCatalog.PLANKS_BLOCK_ID) == 0,
+        require(Inventory.count(10) == 0,
                 "Crafting sticks should consume two vertical planks");
-        require(Inventory.count(ItemCatalog.STICK_ITEM_ID) == 2,
+        require(Inventory.count(100) == 2,
                 "Two vertical planks should produce two sticks");
         GuiManager.handleKeyEvent(18, true);
 
@@ -124,7 +124,7 @@ public final class TransformerVerification {
         BlockSelection.handleKeyEvent(18, true, false);
         require(!GuiManager.isOpen(), "E should close crafting");
 
-        require(BlockGuiRegistry.openForBlock(ItemCatalog.PLANKS_BLOCK_ID),
+        require(BlockGuiRegistry.openForBlock(10),
                 "Planks should be registered with the reusable block GUI system");
         // Screen-space button point (450,340), converted back to LWJGL's bottom-left Y.
         GuiManager.handleMouseEvent(450, 427, 0, true, 0, 1024, 768);

@@ -74,7 +74,7 @@ final class GuiGraphics {
         fillRect(x + inset, y + inset, size - inset * 2, size - inset * 2,
                 color[0] * 0.55f, color[1] * 0.55f, color[2] * 0.55f, 1.0f);
 
-        if (itemId == ItemCatalog.STICK_ITEM_ID) {
+        if (itemId == 100) {
             int center = x + size / 2;
             fillRect(center - 2, y + inset, 4, size - inset * 2,
                     0.64f, 0.40f, 0.18f, 1.0f);

@@ -197,7 +197,7 @@ public final class GuiManager {
             if (itemId >= 0) {
                 occupied++;
             }
-            if (itemId == ItemCatalog.9) {
+            if (itemId == 9) {
                 wood++;
             }
         }

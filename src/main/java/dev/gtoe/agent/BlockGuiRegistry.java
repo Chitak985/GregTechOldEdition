@@ -9,7 +9,7 @@ public final class BlockGuiRegistry {
             new HashMap<Integer, Definition>();
 
     static {
-        register(ItemCatalog.PLANKS_BLOCK_ID, "Test", "Test button");
+        register(10, "Test", "Test button");
     }
 
     private BlockGuiRegistry() {
