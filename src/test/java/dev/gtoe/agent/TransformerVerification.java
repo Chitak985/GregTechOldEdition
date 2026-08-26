@@ -3,6 +3,7 @@ package dev.gtoe.agent;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -44,6 +45,7 @@ public final class TransformerVerification {
         require(TerrainLayers.blockIdForY(19) == 4, "Y=19 should use block ID 4");
         require(TerrainLayers.blockIdForY(20) == 3, "Y=20 should use block ID 3");
         require(TerrainLayers.blockIdForY(40) == 1, "Y=40 should use block ID 1");
+        verifyTreeGeneration();
 
         BlockSelection.handleKeyEvent(5, true, false);
         require(BlockSelection.selectedBlockId() == 4, "Number 4 should select block ID 4");
@@ -60,7 +62,74 @@ public final class TransformerVerification {
 
         verifyInventoryAndRecipes();
 
-        System.out.println("Transformer verification passed: inventory, recipes, input, and world actions are correct");
+        System.out.println("Transformer verification passed: trees, inventory, recipes, input, and world actions are correct");
+    }
+
+    private static void verifyTreeGeneration() {
+        int width = 100;
+        int height = 1;
+        int depth = 16;
+        byte[] blocks = flatWorld(width, height, depth, 0);
+        int trees = TreeGenerator.generate(
+                blocks, width, height, depth, new CyclingChanceRandom());
+        require(trees == 5, "Exactly 5 of 100 eligible surface blocks should pass a 5% roll");
+
+        int woodBlocks = 0;
+        for (byte block : blocks) {
+            if ((block & 255) == 9) {
+                woodBlocks++;
+            }
+        }
+        require(woodBlocks == trees * 4,
+                "Minimum-height tree rolls should create four wood blocks per trunk");
+        for (int x = 0; x < width; x++) {
+            require((blocks[x] & 255) == 1, "Tree generation must not replace surface blocks");
+        }
+
+        byte[] maximumTree = flatWorld(1, 1, 16, 0);
+        int maximumTrees = TreeGenerator.generate(
+                maximumTree, 1, 1, 16, new MaximumHeightRandom());
+        require(maximumTrees == 1, "Forced chance roll should create one tree");
+        for (int y = 1; y <= 10; y++) {
+            require((maximumTree[y] & 255) == 9,
+                    "Maximum-height tree should contain wood at Y=" + y);
+        }
+        require((maximumTree[11] & 255) == 0,
+                "Tree height must never exceed ten blocks");
+    }
+
+    private static byte[] flatWorld(int width, int height, int depth, int surfaceY) {
+        byte[] blocks = new byte[width * height * depth];
+        for (int y = 0; y <= surfaceY; y++) {
+            for (int z = 0; z < height; z++) {
+                for (int x = 0; x < width; x++) {
+                    blocks[(y * height + z) * width + x] = 1;
+                }
+            }
+        }
+        return blocks;
+    }
+
+    private static final class CyclingChanceRandom extends Random {
+        private static final long serialVersionUID = 1L;
+        private int chance;
+
+        @Override
+        public int nextInt(int bound) {
+            if (bound == 100) {
+                return chance++ % 100;
+            }
+            return 0;
+        }
+    }
+
+    private static final class MaximumHeightRandom extends Random {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public int nextInt(int bound) {
+            return bound == 100 ? 0 : bound - 1;
+        }
     }
 
     private static void verifyInventoryAndRecipes() {

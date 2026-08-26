@@ -2,6 +2,7 @@ package dev.gtoe.agent;
 
 import java.lang.reflect.Field;
 import java.util.Arrays;
+import java.util.Random;
 
 /** Runtime layer configuration and one-time conversion of the game's block array. */
 public final class TerrainLayers {
@@ -58,8 +59,11 @@ public final class TerrainLayers {
                 }
             }
 
+            int trees = TreeGenerator.generate(
+                    blocks, width, height, depth, new Random());
+
             System.out.println("[gtoe] Applied Y-level block types; changed "
-                    + changed + " solid blocks");
+                    + changed + " solid blocks and generated " + trees + " trees");
         } catch (ReflectiveOperationException error) {
             throw new IllegalStateException("Could not access rd-132211 Level fields", error);
         }
