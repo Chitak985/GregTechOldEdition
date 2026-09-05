@@ -35,11 +35,14 @@ public final class TreeGenerator {
             for (int x = 0; x < width; x++) {
                 int surfaceY = findSurface(blocks, width, height, depth, x, z);
                 int availableHeight = depth - surfaceY - 1;
-                if (surfaceY < 0 || availableHeight < MIN_TREE_HEIGHT) {
-                    continue;
-                }
                 if (random.nextInt(100) >= TREE_CHANCE_PERCENT) {
-                    continue;
+                    continue;  // Chance check
+                }
+                if ((blocks[index(width, height, x, surfaceY, z)] & 255) != 1) {
+                    continue;  // Grass check
+                }
+                if (surfaceY < 0 || availableHeight < MIN_TREE_HEIGHT) {
+                    continue;  // Height check
                 }
 
                 int maximumHeight = Math.min(MAX_TREE_HEIGHT, availableHeight);
