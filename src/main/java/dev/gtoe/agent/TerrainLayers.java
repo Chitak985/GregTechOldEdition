@@ -6,7 +6,7 @@ import java.util.Random;
 
 /** Runtime layer configuration and one-time conversion of the game's block array. */
 public final class TerrainLayers {
-    public static final int MAX_BLOCK_ID = 19;
+    public static final int MAX_BLOCK_ID = 27;
 
     private static final int[] LAYER_STARTS = {0, 8, 20, 32, 40};
     private static final int[] BLOCK_IDS = {5, 4, 3, 2, 1};
