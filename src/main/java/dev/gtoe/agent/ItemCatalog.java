@@ -23,6 +23,7 @@ public final class ItemCatalog {
             case 103: return "Coal";
             case 104: return "Tin Ingot";
             case 105: return "Bronze Ingot";
+            case 106: return "Flint";
             default: return "Unknown Item";
         }
     }
@@ -48,7 +49,15 @@ public final class ItemCatalog {
             case 16: return "Iron Ore";
             case 17: return "Coal Ore";
             case 18: return "Tin Ore";
-            case 19: return "Machine";
+            case 19: return "Basic Machine";  // LV machine
+            case 20: return "Gravel";
+            case 21: return "Hardened Stone";  // 2 stone 2 flint
+            case 22: return "Furnace Main Hatch";
+            case 23: return "Furnace Exhaust";
+            case 24: return "Furnace Fuel Hatch";
+            case 25: return "Furnace Fuel Chamber";
+            case 26: return "Furnace Main Chamber";
+            case 27: return "Cupronickel Coil Block";
             default: return "Unknown Block";
         }
     }
