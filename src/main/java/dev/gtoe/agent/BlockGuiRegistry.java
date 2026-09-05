@@ -2,6 +2,10 @@ package dev.gtoe.agent;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
+
+// Remove the "simple" text and button code
 
 /** Registry that lets block IDs opt into reusable simple GUIs without touching game classes. */
 public final class BlockGuiRegistry {
@@ -20,7 +24,7 @@ public final class BlockGuiRegistry {
 
     public static synchronized void register(int blockId, String title, String buttonText) {
         if (!ItemCatalog.isBlock(blockId)) {
-            throw new IllegalArgumentException("BlockGuiRegistry/register: Cannot register GUI for block ID "+String.valueOf(blockID)+" as it is not considered a block!");
+            throw new IllegalArgumentException("BlockGuiRegistry/register: Cannot register GUI for block ID "+String.valueOf(blockId)+" as it is not considered a block!");
         }
         DEFINITIONS.put(Integer.valueOf(blockId), new Definition(title, buttonText));
     }
@@ -41,15 +45,28 @@ public final class BlockGuiRegistry {
         public String title;
         public String buttonText;
         public List<GUIButton> buttons;
-
-        public Definition(String title, String buttonText, buttons) {
+        public List<GUIText> texts;
+    
+        public Definition(String title,
+                          String buttonText,
+                          List<GUIButton> buttons,
+                          List<GUIText> texts) {
             this.title = title;
             this.buttonText = buttonText;
-            this.buttons = buttons;
+            this.buttons = buttons != null ? buttons : new ArrayList<GUIButton>();
+            this.texts = texts != null ? texts : new ArrayList<GUIText>();
         }
-
+    
+        // Both lists default to empty
+        public Definition(String title, String buttonText) {
+            this(title, buttonText, null, null);
+        }
+    
         public synchronized void render() {
             for (GUIButton tmp : buttons) {
+                tmp.render();
+            }
+            for (GUIText tmp : texts) {
                 tmp.render();
             }
         }
@@ -63,12 +80,23 @@ public final class BlockGuiRegistry {
         public String callback;
         public int posX;
         public int posY;
+        public int width;
+        public int height;
 
-        public GUIButton(String text, String callback, int posX, int posY) {
+        public GUIButton(String text, String callback, int posX, int posY, int width, int height) {
             this.text = text;
             this.callback = callback;
             this.posX = posX;
             this.posY = posY;
+            this.width = width;
+            this.height = height;
+        }
+        public GUIButton(String text, String callback, int posX, int posY) {
+            this(text, callback, posX, posY, 140, 28);
+        }
+
+        public synchronized void render() {
+            GuiGraphics.drawButton(posX, posY, width, height, text);
         }
     }
 
@@ -78,18 +106,18 @@ public final class BlockGuiRegistry {
         public String text;
         public int posX;
         public int posY;
-        public int scale = 2f;
-        public float colR = 0.93f;
-        public float colG = 0.93f;
-        public float colB = 0.93f;
+        public float scale;
+        public float colR;
+        public float colG;
+        public float colB;
 
-        public GUIText(String text,              // Text
-                          int posX,              // X position in pixels
-                          int posY,              // Y position in pixels
-                          int scale = 2f,        // Text scale
-                          float colR = 0.93f,    // Color (Red in RGB)
-                          float colG = 0.93f,    // Color (Green in RGB)
-                          float colB = 0.93f) {  // Color (Blue in RGB)
+        public GUIText(String text,      // Text
+                          int posX,      // X position in pixels
+                          int posY,      // Y position in pixels
+                          float scale,   // Text scale
+                          float colR,    // Color (Red in RGB)
+                          float colG,    // Color (Green in RGB)
+                          float colB) {  // Color (Blue in RGB)
             this.text = text;
             this.posX = posX;
             this.posY = posY;
@@ -97,6 +125,12 @@ public final class BlockGuiRegistry {
             this.colR = colR;
             this.colG = colG;
             this.colB = colB;
+        }
+        public GUIText(String text, int posX, int posY) {
+            this(text, posX, posY, 2f, 0.93f, 0.93f, 0.93f);
+        }
+        public GUIText(String text, int posX, int posY, float scale) {
+            this(text, posX, posY, scale, 0.93f, 0.93f, 0.93f);
         }
 
         public synchronized void render() {
