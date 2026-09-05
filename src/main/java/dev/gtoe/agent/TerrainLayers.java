@@ -59,11 +59,18 @@ public final class TerrainLayers {
                 }
             }
 
+            Random random = new Random();
+
+            int patches = TerrainPatchGenerator.generate(
+                    blocks, width, height, depth, random);
+            
             int trees = TreeGenerator.generate(
-                    blocks, width, height, depth, new Random());
+                    blocks, width, height, depth, random);
 
             System.out.println("[gtoe] Applied Y-level block types; changed "
-                    + changed + " solid blocks and generated " + trees + " trees");
+                + changed + " solid blocks, generated "
+                + patches + " terrain patches and "
+                + trees + " trees");
         } catch (ReflectiveOperationException error) {
             throw new IllegalStateException("Could not access rd-132211 Level fields", error);
         }
