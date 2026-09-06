@@ -1,15 +1,20 @@
 package dev.gtoe.agent;
 
 import java.util.Arrays;
+import java.util.Objects;
 
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
+
+import static dev.gtoe.agent.BlockGuiRegistry.Definition;
+import static dev.gtoe.agent.BlockGuiRegistry.GUIButton;
+import static dev.gtoe.agent.BlockGuiRegistry.GUIText;
 
 /** Global input, state, crafting, and rendering coordinator for agent-owned GUIs. */
 public final class GuiManager {
     private static final int SCREEN_NONE = 0;
     private static final int SCREEN_CRAFTING = 1;
-    private static final int SCREEN_SIMPLE = 2;
+    private static final int SCREEN_DEFINITION = 2;
     private static final int KEY_E = 18;
     private static final int LEFT_MOUSE_BUTTON = 0;
 
@@ -20,9 +25,8 @@ public final class GuiManager {
     private static int scrollRow;
     private static int mouseX;
     private static int mouseY;
+    private static Definition screen_definition;
     private static boolean currentMouseEventOwnedByGui;
-    private static String simpleTitle = "";
-    private static String simpleButtonText = "";
 
     private GuiManager() {
     }
@@ -49,8 +53,6 @@ public final class GuiManager {
                 returnCraftingItems();
                 screen = SCREEN_CRAFTING;
                 scrollRow = 0;
-                simpleTitle = "";
-                simpleButtonText = "";
                 setMouseGrabbed(false);
             }
             return true;
@@ -59,11 +61,10 @@ public final class GuiManager {
         return screen != SCREEN_NONE;
     }
 
-    public static synchronized void openSimple(String title, String buttonText) {
+    public static synchronized void openDefinition(Definition definition) {
         returnCraftingItems();
-        simpleTitle = title == null ? "" : title;
-        simpleButtonText = buttonText == null ? "" : buttonText;
-        screen = SCREEN_SIMPLE;
+        screen = SCREEN_DEFINITION;
+        screen_definition = definition;
         setMouseGrabbed(false);
     }
 
@@ -103,9 +104,15 @@ public final class GuiManager {
         }
 
         Layout layout = new Layout(screenWidth, screenHeight);
-        if (screen == SCREEN_SIMPLE) {
-            if (pressed && layout.isInSimpleButton(mouseX, mouseY)) {
-                closeInternal();
+        if (screen == SCREEN_DEFINITION) {
+            if (pressed) {
+                for (GUIButton tmp : screen_definition.buttons) {
+                    if (layout.isInButton(mouseX, mouseY, tmp)) {
+                        if (Objects.equals(tmp.callback, "CLOSE")) {
+                            closeInternal();
+                        }
+                    }
+                }
             }
             return;
         }
@@ -165,12 +172,8 @@ public final class GuiManager {
 
         Layout layout = new Layout(screenWidth, screenHeight);
         GuiGraphics.drawPanel(layout.panelX, layout.panelY, layout.panelWidth, layout.panelHeight);
-        if (screen == SCREEN_SIMPLE) {
-            GuiGraphics.drawTextNormal(simpleTitle, layout.panelX + 16, layout.panelY + 18);
-            GuiGraphics.drawButton(
-                    layout.simpleButtonX, layout.simpleButtonY,
-                    layout.simpleButtonWidth, layout.simpleButtonHeight,
-                    simpleButtonText);
+        if (screen == SCREEN_DEFINITION) {
+            screen_definition.render(layout);
             return;
         }
 
@@ -223,8 +226,7 @@ public final class GuiManager {
         screen = SCREEN_NONE;
         scrollRow = 0;
         currentMouseEventOwnedByGui = false;
-        simpleTitle = "";
-        simpleButtonText = "";
+        screen_definition = null;
     }
 
     private static void renderCrafting(Layout layout) {
@@ -291,8 +293,7 @@ public final class GuiManager {
     private static void closeInternal() {
         returnCraftingItems();
         screen = SCREEN_NONE;
-        simpleTitle = "";
-        simpleButtonText = "";
+        screen_definition = null;
         setMouseGrabbed(true);
     }
 
@@ -321,11 +322,11 @@ public final class GuiManager {
         return pointX >= x && pointY >= y && pointX < x + width && pointY < y + height;
     }
 
-    private static final class Layout {
-        private final int panelWidth = 300;
-        private final int panelHeight = 260;
-        private final int panelX;
-        private final int panelY;
+    public static final class Layout {
+        public final int panelWidth = 300;
+        public final int panelHeight = 260;
+        public final int panelX;
+        public final int panelY;
         private final int craftSlotSize = 30;
         private final int gridPitch = 32;
         private final int gridX;
@@ -336,10 +337,6 @@ public final class GuiManager {
         private final int inventoryPitch = 22;
         private final int inventoryX;
         private final int inventoryY;
-        private final int simpleButtonWidth = 140;
-        private final int simpleButtonHeight = 28;
-        private final int simpleButtonX;
-        private final int simpleButtonY;
 
         private Layout(int screenWidth, int screenHeight) {
             panelX = Math.max(4, (screenWidth - panelWidth) / 2);
@@ -350,8 +347,6 @@ public final class GuiManager {
             outputY = gridY + 16;
             inventoryX = panelX + 40;
             inventoryY = panelY + 180;
-            simpleButtonX = panelX + (panelWidth - simpleButtonWidth) / 2;
-            simpleButtonY = panelY + 82;
         }
 
         private int gridIndexAt(int x, int y) {
@@ -379,9 +374,14 @@ public final class GuiManager {
             return contains(outputX, outputY, craftSlotSize, craftSlotSize, x, y);
         }
 
-        private boolean isInSimpleButton(int x, int y) {
-            return contains(simpleButtonX, simpleButtonY,
-                    simpleButtonWidth, simpleButtonHeight, x, y);
+        private boolean isInButton(int x, int y, GUIButton button) {
+            return contains(button.posX, button.posY,
+                    button.width, button.height, x, y);
+        }
+
+        private boolean isInRect(int x, int y, int rectX, int rectY, int rectWidth, int rectHeight) {
+            return contains(rectX, rectY,
+                    rectWidth, rectHeight, x, y);
         }
     }
 }

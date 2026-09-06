@@ -1,3 +1,6 @@
+import javax.imageio.ImageIO
+import java.awt.image.BufferedImage
+
 plugins {
     id 'java'
     id 'com.github.johnrengelman.shadow' version '8.1.1'
@@ -26,8 +29,8 @@ tasks.register('generateTerrainTexture') {
         File destination = outputFile.get().asFile
         destination.parentFile.mkdirs()
 
-        def image = new java.awt.image.BufferedImage(
-            256, 256, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+        def image = new BufferedImage(
+            256, 256, BufferedImage.TYPE_INT_ARGB)
 
         for (int y = 0; y < 256; y++) {
             for (int x = 0; x < 256; x++) {
@@ -138,7 +141,7 @@ tasks.register('generateTerrainTexture') {
             }
         }
 
-        javax.imageio.ImageIO.write(image, 'png', destination)
+        ImageIO.write(image, 'png', destination)
     }
 }
 
@@ -216,11 +219,21 @@ tasks.named('wrapper') {
 }
 
 tasks.register('runPrism', Exec) {
-    group = 'run'
-    description = 'Builds GTOE and launches the rd-132211 Prism instance.'
-
-    dependsOn tasks.named('build')
-
     commandLine 'C:\\Users\\name\\AppData\\Local\\Programs\\PrismLauncher\\prismlauncher.exe',
             '--launch', 'rd-132211'
+}
+
+tasks.register('clearSave', Delete) {
+    delete file("C:\\Users\\name\\AppData\\Roaming\\PrismLauncher\\instances\\rd-132211\\minecraft\\level.dat")
+}
+
+tasks.register('launch') {
+    dependsOn tasks.named('build')
+    dependsOn tasks.named('runPrism')
+}
+
+tasks.register('launchCleared') {
+    dependsOn tasks.named('build')
+    dependsOn tasks.named('clearSave')
+    dependsOn tasks.named('runPrism')
 }

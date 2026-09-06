@@ -1,9 +1,8 @@
 package dev.gtoe.agent;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.List;
-import java.util.ArrayList;
+import java.util.*;
+
+import static dev.gtoe.agent.GuiManager.Layout;
 
 // Remove the "simple" text and button code
 
@@ -11,22 +10,35 @@ import java.util.ArrayList;
 public final class BlockGuiRegistry {
     // All the GUI definitions as block ID: definition
     private static final Map<Integer, Definition> DEFINITIONS =
-            new HashMap<Integer, Definition>();
+            new HashMap<>();
 
     static {
         // Add block GUIs here
         // First number is the block ID
-        register(10, "Test", "Test button");
+        register(10,
+                Collections.singletonList(
+                        new GUIText("Hello", 16, 16)
+                ),
+                Collections.singletonList(
+                        new GUIButton("Button 1",
+                                "callback1",
+                                140,
+                                82,
+                                140,
+                                28)
+                ));
     }
 
     private BlockGuiRegistry() {
     }
 
-    public static synchronized void register(int blockId, String title, String buttonText) {
+    public static synchronized void register(int blockId,
+                                             List<GUIText> texts,
+                                             List<GUIButton> buttons) {
         if (!ItemCatalog.isBlock(blockId)) {
             throw new IllegalArgumentException("BlockGuiRegistry/register: Cannot register GUI for block ID "+blockId+" as it is not considered a block!");
         }
-        DEFINITIONS.put(blockId, new Definition(title, buttonText));
+        DEFINITIONS.put(blockId, new Definition(texts, buttons));
     }
 
     // Called if a block is right-clicked to open a GUI
@@ -35,39 +47,28 @@ public final class BlockGuiRegistry {
         if (definition == null) {  // Skip if it has no GUI
             return false;
         }
-        GuiManager.openSimple(definition.title, definition.buttonText);  // Open a simple GUI
+        GuiManager.openDefinition(definition);
         return true;
     }
 
     // Stores the GUI definition data
     // Everything is public to make it modifiable if needed
     public static class Definition {
-        public String title;
-        public String buttonText;
         public List<GUIButton> buttons;
         public List<GUIText> texts;
     
-        public Definition(String title,
-                          String buttonText,
-                          List<GUIButton> buttons,
-                          List<GUIText> texts) {
-            this.title = title;
-            this.buttonText = buttonText;
-            this.buttons = buttons != null ? buttons : new ArrayList<GUIButton>();
-            this.texts = texts != null ? texts : new ArrayList<GUIText>();
+        public Definition(List<GUIText> texts,
+                          List<GUIButton> buttons) {
+            this.texts = texts != null ? texts : new ArrayList<>();
+            this.buttons = buttons != null ? buttons : new ArrayList<>();
         }
     
-        // Both lists default to empty
-        public Definition(String title, String buttonText) {
-            this(title, buttonText, null, null);
-        }
-    
-        public synchronized void render() {
+        public synchronized void render(Layout layout) {
             for (GUIButton tmp : buttons) {
-                tmp.render();
+                tmp.render(layout);
             }
             for (GUIText tmp : texts) {
-                tmp.render();
+                tmp.render(layout);
             }
         }
     }
@@ -91,12 +92,18 @@ public final class BlockGuiRegistry {
             this.width = width;
             this.height = height;
         }
+        // Default width and height
         public GUIButton(String text, String callback, int posX, int posY) {
             this(text, callback, posX, posY, 140, 28);
         }
 
-        public synchronized void render() {
-            GuiGraphics.drawButton(posX, posY, width, height, text);
+        public synchronized void render(Layout layout) {
+            GuiGraphics.drawButton(
+                    posX,
+                    posY,
+                    layout.panelX + width,
+                    layout.panelY + height,
+                    text);
         }
     }
 
@@ -126,15 +133,17 @@ public final class BlockGuiRegistry {
             this.colG = colG;
             this.colB = colB;
         }
+        // Default scale and color
         public GUIText(String text, int posX, int posY) {
-            this(text, posX, posY, 2, 0.93f, 0.93f, 0.93f);
+            this(text, posX, posY, 2);
         }
+        // Default color
         public GUIText(String text, int posX, int posY, int scale) {
             this(text, posX, posY, scale, 0.93f, 0.93f, 0.93f);
         }
 
-        public synchronized void render() {
-            GuiGraphics.drawTextShadowed(text, posX, posY, scale, colR, colG, colB);
+        public synchronized void render(Layout layout) {
+            GuiGraphics.drawTextShadowed(text, layout.panelX + posX, layout.panelY + posY, scale, colR, colG, colB);
         }
     }
 }
