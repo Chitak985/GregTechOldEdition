@@ -57,8 +57,8 @@ public final class TransformerVerification {
         require(BlockSelection.selectedBlockId() == 11, "Shift+1 should select block ID 11");
         BlockSelection.handleKeyEvent(10, true, true);
         require(BlockSelection.selectedBlockId() == 19, "Shift+9 should select block ID 19");
-        require("Machine".equals(BlockSelection.selectedBlockName()),
-                "Block ID 19 should be named Machine");
+        require("Basic Machine".equals(BlockSelection.selectedBlockName()),
+                "Block ID 19 should be named Basic Machine");
 
         verifyInventoryAndRecipes();
 

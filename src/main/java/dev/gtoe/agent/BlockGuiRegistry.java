@@ -24,14 +24,14 @@ public final class BlockGuiRegistry {
 
     public static synchronized void register(int blockId, String title, String buttonText) {
         if (!ItemCatalog.isBlock(blockId)) {
-            throw new IllegalArgumentException("BlockGuiRegistry/register: Cannot register GUI for block ID "+String.valueOf(blockId)+" as it is not considered a block!");
+            throw new IllegalArgumentException("BlockGuiRegistry/register: Cannot register GUI for block ID "+blockId+" as it is not considered a block!");
         }
-        DEFINITIONS.put(Integer.valueOf(blockId), new Definition(title, buttonText));
+        DEFINITIONS.put(blockId, new Definition(title, buttonText));
     }
 
-    // Called if a block is right clicked to open a GUI
+    // Called if a block is right-clicked to open a GUI
     public static synchronized boolean openForBlock(int blockId) {
-        Definition definition = DEFINITIONS.get(Integer.valueOf(blockId));  // Get the block's GUI definition
+        Definition definition = DEFINITIONS.get(blockId);  // Get the block's GUI definition
         if (definition == null) {  // Skip if it has no GUI
             return false;
         }
@@ -40,7 +40,7 @@ public final class BlockGuiRegistry {
     }
 
     // Stores the GUI definition data
-    // Everything is public to make it modifyable if needed
+    // Everything is public to make it modifiable if needed
     public static class Definition {
         public String title;
         public String buttonText;
@@ -74,7 +74,7 @@ public final class BlockGuiRegistry {
 
     // Stores GUI button data
     // callback is checked elsewhere to do a hard-coded action
-    // Everything is public to make it modifyable if needed
+    // Everything is public to make it modifiable if needed
     public static class GUIButton {
         public String text;
         public String callback;
@@ -101,12 +101,12 @@ public final class BlockGuiRegistry {
     }
 
     // Stores GUI text data
-    // Everything is public to make it modifyable if needed
+    // Everything is public to make it modifiable if needed
     public static class GUIText {
         public String text;
         public int posX;
         public int posY;
-        public float scale;
+        public int scale;
         public float colR;
         public float colG;
         public float colB;
@@ -114,7 +114,7 @@ public final class BlockGuiRegistry {
         public GUIText(String text,      // Text
                           int posX,      // X position in pixels
                           int posY,      // Y position in pixels
-                          float scale,   // Text scale
+                          int scale,   // Text scale
                           float colR,    // Color (Red in RGB)
                           float colG,    // Color (Green in RGB)
                           float colB) {  // Color (Blue in RGB)
@@ -127,9 +127,9 @@ public final class BlockGuiRegistry {
             this.colB = colB;
         }
         public GUIText(String text, int posX, int posY) {
-            this(text, posX, posY, 2f, 0.93f, 0.93f, 0.93f);
+            this(text, posX, posY, 2, 0.93f, 0.93f, 0.93f);
         }
-        public GUIText(String text, int posX, int posY, float scale) {
+        public GUIText(String text, int posX, int posY, int scale) {
             this(text, posX, posY, scale, 0.93f, 0.93f, 0.93f);
         }
 

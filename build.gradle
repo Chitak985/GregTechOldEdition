@@ -214,3 +214,13 @@ tasks.named('wrapper') {
     gradleVersion = '8.8'
     distributionType = Wrapper.DistributionType.BIN
 }
+
+tasks.register('runPrism', Exec) {
+    group = 'run'
+    description = 'Builds GTOE and launches the rd-132211 Prism instance.'
+
+    dependsOn tasks.named('build')
+
+    commandLine 'C:\\Users\\name\\AppData\\Local\\Programs\\PrismLauncher\\prismlauncher.exe',
+            '--launch', 'rd-132211'
+}
