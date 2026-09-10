@@ -47,18 +47,34 @@ public final class TransformerVerification {
         require(TerrainLayers.blockIdForY(40) == 1, "Y=40 should use block ID 1");
         verifyTreeGeneration();
 
-        BlockSelection.handleKeyEvent(5, true, false);
-        require(BlockSelection.selectedBlockId() == 4, "Number 4 should select block ID 4");
-        BlockSelection.handleKeyEvent(9, false, false);
+        Inventory.clearForTests();
+        GuiManager.resetForTests();
+        Inventory.addToSlot(Inventory.HOTBAR_START, 7, 1);
+        Inventory.addToSlot(Inventory.HOTBAR_START + 3, 4, 1);
+        Inventory.addToSlot(Inventory.HOTBAR_START + 4, 100, 2);
+        Inventory.addToSlot(Inventory.HOTBAR_START + 8, 19, 1);
+
+        BlockSelection.handleKeyEvent(5, true);
+        require(BlockSelection.selectedBlockId() == 4,
+                "Number 4 should select hotbar slot 4");
+        BlockSelection.handleKeyEvent(9, false);
         require(BlockSelection.selectedBlockId() == 4, "Key release must not change selection");
-        BlockSelection.handleKeyEvent(11, true, false);
-        require(BlockSelection.selectedBlockId() == 10, "Number 0 should select block ID 10");
-        BlockSelection.handleKeyEvent(2, true, true);
-        require(BlockSelection.selectedBlockId() == 11, "Shift+1 should select block ID 11");
-        BlockSelection.handleKeyEvent(10, true, true);
-        require(BlockSelection.selectedBlockId() == 19, "Shift+9 should select block ID 19");
+        BlockSelection.handleKeyEvent(11, true);
+        require(BlockSelection.selectedBlockId() == 4, "Number 0 must not select a hotbar slot");
+        BlockSelection.handleKeyEvent(2, true);
+        require(BlockSelection.selectedBlockId() == 7, "Number 1 should select hotbar slot 1");
+        BlockSelection.handleKeyEvent(10, true);
+        require(BlockSelection.selectedBlockId() == 19, "Number 9 should select hotbar slot 9");
         require("Basic Machine".equals(BlockSelection.selectedBlockName()),
                 "Block ID 19 should be named Basic Machine");
+        BlockSelection.handleKeyEvent(6, true);
+        require(BlockSelection.selectedItemId() == 100,
+                "Number 5 should select the item in hotbar slot 5");
+        require(BlockSelection.selectedBlockId() == 0,
+                "An ordinary item must behave like an empty placement selection");
+        BlockSelection.handleKeyEvent(7, true);
+        require(BlockSelection.selectedBlockId() == 0,
+                "An empty hotbar slot must not be placeable");
 
         verifyInventoryAndRecipes();
 
@@ -143,6 +159,7 @@ public final class TransformerVerification {
         require(level.gtoe$getBlockId(1, 1, 1) == 0, "Breaking should remove the block");
         require(Inventory.count(2) == 1, "Breaking dirt should add one dirt block");
 
+        BlockSelection.handleKeyEvent(2, true);
         WorldActions.placeSelectedBlock(level, 2, 1, 1, 2);
         require(level.gtoe$getBlockId(2, 1, 1) == 2, "Owned dirt should be placeable");
         require(Inventory.count(2) == 0, "Successful placement should consume one dirt block");
@@ -165,8 +182,26 @@ public final class TransformerVerification {
                 "Horizontal planks must not match the stick recipe");
         require("Stick".equals(ItemCatalog.itemName(100)), "Item ID 100 should be Stick");
 
+        // Moving a stack targets exact slots rather than rebuilding a sorted item list.
+        Inventory.clearForTests();
+        Inventory.addToSlot(0, 2, 3);
+        Inventory.addToSlot(Inventory.HOTBAR_START + 4, 100, 2);
+        GuiManager.handleKeyEvent(18, true);
+        drag(410, 442, 476, 464); // Main slot 0 -> main slot 13.
+        require(Inventory.isEmpty(0), "Moving a stack should leave its original slot empty");
+        require(Inventory.itemIdAt(13) == 2 && Inventory.countAt(13) == 3,
+                "A complete stack should move to the exact chosen main-inventory slot");
+        drag(476, 464, 507, 742); // Main slot 13 -> hotbar slot 5.
+        require(Inventory.itemIdAt(13) == 100 && Inventory.countAt(13) == 2,
+                "Dropping onto an occupied slot should swap its stack into the source slot");
+        require(Inventory.itemIdAt(Inventory.HOTBAR_START + 4) == 2
+                        && Inventory.countAt(Inventory.HOTBAR_START + 4) == 3,
+                "A stack should move to the exact chosen hotbar slot");
+        GuiManager.handleKeyEvent(18, true);
+
         // Exercise the real drag/release/output-click flow at the 1024x768 game size.
-        Inventory.add(9, 1);
+        Inventory.clearForTests();
+        Inventory.addToSlot(0, 9, 1);
         GuiManager.handleKeyEvent(18, true);
         drag(410, 442, 440, 320); // Inventory wood -> upper-left crafting slot.
         click(530, 332); // Output: two planks.
@@ -175,8 +210,8 @@ public final class TransformerVerification {
         require(Inventory.count(10) == 2,
                 "Crafting wood should produce two planks");
 
-        drag(410, 442, 440, 320); // First plank -> upper-left.
-        drag(410, 442, 440, 352); // Second plank -> lower-left.
+        drag(395, 742, 440, 320); // First plank -> upper-left.
+        drag(395, 742, 440, 352); // Second plank -> lower-left.
         click(530, 332); // Output: two sticks.
         require(Inventory.count(10) == 0,
                 "Crafting sticks should consume two vertical planks");
@@ -184,24 +219,28 @@ public final class TransformerVerification {
                 "Two vertical planks should produce two sticks");
         GuiManager.handleKeyEvent(18, true);
 
-        int selectionBeforeGui = BlockSelection.selectedBlockId();
-        BlockSelection.handleKeyEvent(18, true, false);
+        BlockSelection.handleKeyEvent(3, true);
+        int selectionBeforeGui = BlockSelection.selectedHotbarIndex();
+        BlockSelection.handleKeyEvent(18, true);
         require(GuiManager.isOpen(), "E should open crafting");
-        BlockSelection.handleKeyEvent(2, true, false);
-        require(BlockSelection.selectedBlockId() == selectionBeforeGui,
+        BlockSelection.handleKeyEvent(2, true);
+        require(BlockSelection.selectedHotbarIndex() == selectionBeforeGui,
                 "Number keys must not change selection while a GUI is open");
-        BlockSelection.handleKeyEvent(18, true, false);
+        BlockSelection.handleKeyEvent(18, true);
         require(!GuiManager.isOpen(), "E should close crafting");
 
         require(BlockGuiRegistry.openForBlock(10),
                 "Planks should be registered with the reusable block GUI system");
-        // TODO: Not sure how to test this with the right coordinates, so commented out for now
-        //       It also uses old logic ("simple UI" stuff)
-        // Screen-space button point (450,340), converted back to LWJGL's bottom-left Y.
-        //GuiManager.handleMouseEvent(450, 427, 0, true, 0, 1024, 768);
-        //require(!GuiManager.isOpen(), "The reusable simple-GUI button should close its window");
+        GuiManager.Layout layout = new GuiManager.Layout(1024, 768);
+        BlockGuiRegistry.GUIButton button =
+                new BlockGuiRegistry.GUIButton("Button", "callback1", 140, 82, 140, 28);
+        require(layout.isInButton(layout.panelX + 141, layout.panelY + 83, button),
+                "Block-GUI button bounds should be relative to the GUI panel");
+        require(!layout.isInButton(141, 83, button),
+                "Block-GUI button bounds must not be interpreted as absolute screen coordinates");
         require(GuiManager.blocksWorldAction(),
-                "A GUI close click must not fall through to world placement");
+                "An open block GUI must block world placement");
+        GuiManager.close();
 
         Inventory.clearForTests();
         GuiManager.resetForTests();

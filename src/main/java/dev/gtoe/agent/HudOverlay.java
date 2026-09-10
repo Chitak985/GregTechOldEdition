@@ -1,6 +1,6 @@
 package dev.gtoe.agent;
 
-/** Selected-block HUD plus the entry point for agent-owned GUI rendering. */
+/** Selected-slot HUD plus the entry point for agent-owned GUI rendering. */
 public final class HudOverlay {
     private static volatile boolean disabled;
 
@@ -16,12 +16,18 @@ public final class HudOverlay {
         try {
             GuiGraphics.begin(screenWidth, screenHeight);
             drawingStarted = true;
-            int selected = BlockSelection.selectedBlockId();
-            GuiGraphics.drawTextNormal(
-                    "BLOCK " + ItemCatalog.blockName(selected)
-                            + " X" + Inventory.count(selected),
-                    4, 4);
+            int selected = BlockSelection.selectedItemId();
+            String label;
+            if (selected < 0) {
+                label = "SLOT " + (BlockSelection.selectedHotbarIndex() + 1) + " EMPTY";
+            } else {
+                String type = selected > 0 && ItemCatalog.isBlock(selected) ? "BLOCK " : "ITEM ";
+                label = type + ItemCatalog.itemName(selected)
+                        + " X" + BlockSelection.selectedItemCount();
+            }
+            GuiGraphics.drawTextNormal(label, 4, 4);
             GuiManager.render(screenWidth, screenHeight);
+            GuiManager.renderHotbar(screenWidth, screenHeight);
         } catch (Throwable error) {
             disabled = true;
             System.err.println("[gtoe] Disabling HUD and GUI rendering after an error");

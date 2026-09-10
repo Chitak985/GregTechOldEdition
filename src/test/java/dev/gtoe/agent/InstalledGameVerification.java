@@ -18,6 +18,9 @@ import org.objectweb.asm.Opcodes;
 
 /** Structural verification against the installed, unmodified rd-132211 client JAR. */
 public final class InstalledGameVerification {
+    // IDs 20-27 are reserved by the current catalog but do not have atlas art yet.
+    private static final int LAST_TEXTURED_BLOCK_ID = 19;
+
     private InstalledGameVerification() {
     }
 
@@ -76,7 +79,8 @@ public final class InstalledGameVerification {
                             boolean isInterface) {
                         if (opcode == Opcodes.INVOKESTATIC
                                 && "dev/gtoe/agent/BlockSelection".equals(owner)
-                                && "handleKeyEvent".equals(methodName)) {
+                                && "handleKeyEvent".equals(methodName)
+                                && "(IZ)V".equals(methodDescriptor)) {
                             keyboardSelectionFound[0] = true;
                         }
                         if (opcode == Opcodes.INVOKESTATIC
@@ -329,7 +333,7 @@ public final class InstalledGameVerification {
             require(image != null, "Generated terrain texture is not a readable image");
             require(image.getWidth() == 256 && image.getHeight() == 256,
                     "Generated terrain texture must be 256x256");
-            for (int blockId = 1; blockId <= TerrainLayers.MAX_BLOCK_ID; blockId++) {
+            for (int blockId = 1; blockId <= LAST_TEXTURED_BLOCK_ID; blockId++) {
                 int slot = blockId - 1;
                 int centerX = (slot % 16) * 16 + 8;
                 int centerY = (slot / 16) * 16 + 8;

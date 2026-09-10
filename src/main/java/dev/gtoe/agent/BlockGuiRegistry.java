@@ -99,10 +99,10 @@ public final class BlockGuiRegistry {
 
         public synchronized void render(Layout layout) {
             GuiGraphics.drawButton(
-                    posX,
-                    posY,
-                    layout.panelX + width,
-                    layout.panelY + height,
+                    layout.panelX + posX,
+                    layout.panelY + posY,
+                    width,
+                    height,
                     text);
         }
     }

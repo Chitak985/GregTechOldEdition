@@ -28,8 +28,11 @@ public final class WorldActions {
 
             setTile(level, x, y, z, 0);
             if (blockIdAt(level, x, y, z) == 0) {
-                Inventory.add(blockId, 1);
-                System.out.println("[gtoe] Collected " + ItemCatalog.itemName(blockId));
+                if (Inventory.add(blockId, 1)) {
+                    System.out.println("[gtoe] Collected " + ItemCatalog.itemName(blockId));
+                } else {
+                    setTile(level, x, y, z, blockId);
+                }
             }
         } catch (Throwable error) {
             reportReflectionError(error);
@@ -42,9 +45,12 @@ public final class WorldActions {
             return;
         }
 
+        int selectedSlot = BlockSelection.selectedInventorySlot();
         boolean reserved = false;
         try {
-            if (blockIdAt(level, x, y, z) != 0 || !Inventory.remove(blockId, 1)) {
+            if (blockIdAt(level, x, y, z) != 0
+                    || Inventory.itemIdAt(selectedSlot) != blockId
+                    || !Inventory.removeFromSlot(selectedSlot, blockId, 1)) {
                 return;
             }
             reserved = true;
@@ -53,14 +59,20 @@ public final class WorldActions {
             if (blockIdAt(level, x, y, z) == blockId) {
                 reserved = false;
             } else {
-                Inventory.add(blockId, 1);
+                restoreReservedBlock(selectedSlot, blockId);
                 reserved = false;
             }
         } catch (Throwable error) {
             if (reserved) {
-                Inventory.add(blockId, 1);
+                restoreReservedBlock(selectedSlot, blockId);
             }
             reportReflectionError(error);
+        }
+    }
+
+    private static void restoreReservedBlock(int selectedSlot, int blockId) {
+        if (!Inventory.addToSlot(selectedSlot, blockId, 1)) {
+            Inventory.add(blockId, 1);
         }
     }
 

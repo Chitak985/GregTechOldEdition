@@ -179,26 +179,11 @@ final class GtoeTransformer implements ClassFileTransformer {
                                         "getEventKeyState",
                                         "()Z",
                                         false);
-                                pushInt(this, 42);
-                                super.visitMethodInsn(
-                                        Opcodes.INVOKESTATIC,
-                                        "org/lwjgl/input/Keyboard",
-                                        "isKeyDown",
-                                        "(I)Z",
-                                        false);
-                                pushInt(this, 54);
-                                super.visitMethodInsn(
-                                        Opcodes.INVOKESTATIC,
-                                        "org/lwjgl/input/Keyboard",
-                                        "isKeyDown",
-                                        "(I)Z",
-                                        false);
-                                super.visitInsn(Opcodes.IOR);
                                 super.visitMethodInsn(
                                         Opcodes.INVOKESTATIC,
                                         BLOCK_SELECTION,
                                         "handleKeyEvent",
-                                        "(IZZ)V",
+                                        "(IZ)V",
                                         false);
                                 keyboardPatched[0] = true;
                             }

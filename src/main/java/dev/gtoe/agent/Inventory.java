@@ -1,78 +1,226 @@
 package dev.gtoe.agent;
 
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.Arrays;
 
-/** Process-wide player inventory, accessible to every transformed hook and GUI. */
+/**
+ * A fixed-slot inventory shared by world actions and GUI screens.
+ *
+ * <p>The first 90 slots form the scrollable 10-column inventory. The last
+ * nine slots form the always-visible hotbar.</p>
+ */
 public final class Inventory {
-    private static final TreeMap<Integer, Integer> COUNTS = new TreeMap<Integer, Integer>();
+    public static final int EMPTY_ITEM_ID = -1;
+    public static final int MAIN_COLUMNS = 10;
+    public static final int MAIN_ROWS = 9;
+    public static final int MAIN_SLOT_COUNT = MAIN_COLUMNS * MAIN_ROWS;
+    public static final int HOTBAR_SLOT_COUNT = 9;
+    public static final int HOTBAR_START = MAIN_SLOT_COUNT;
+    public static final int TOTAL_SLOT_COUNT = MAIN_SLOT_COUNT + HOTBAR_SLOT_COUNT;
+
+    private static final int[] ITEM_IDS = new int[TOTAL_SLOT_COUNT];
+    private static final int[] COUNTS = new int[TOTAL_SLOT_COUNT];
+
+    static {
+        Arrays.fill(ITEM_IDS, EMPTY_ITEM_ID);
+    }
 
     private Inventory() {
     }
 
-    public static synchronized void add(int itemId, int amount) {
-        requireValid(itemId, amount);
-        Integer current = COUNTS.get(Integer.valueOf(itemId));
-        int count = current == null ? 0 : current.intValue();
-        COUNTS.put(Integer.valueOf(itemId), Integer.valueOf(count + amount));
-    }
+    public static synchronized boolean add(int itemId, int amount) {
+        validateItem(itemId, amount);
 
-    public static synchronized boolean remove(int itemId, int amount) {
-        requireValid(itemId, amount);
-        Integer current = COUNTS.get(Integer.valueOf(itemId));
-        if (current == null || current.intValue() < amount) {
+        int existingSlot = findItem(itemId);
+        if (existingSlot >= 0) {
+            COUNTS[existingSlot] += amount;
+            return true;
+        }
+
+        int emptySlot = findEmpty(HOTBAR_START, TOTAL_SLOT_COUNT);
+        if (emptySlot < 0) {
+            emptySlot = findEmpty(0, MAIN_SLOT_COUNT);
+        }
+        if (emptySlot < 0) {
             return false;
         }
 
-        int remaining = current.intValue() - amount;
-        if (remaining == 0) {
-            COUNTS.remove(Integer.valueOf(itemId));
-        } else {
-            COUNTS.put(Integer.valueOf(itemId), Integer.valueOf(remaining));
+        ITEM_IDS[emptySlot] = itemId;
+        COUNTS[emptySlot] = amount;
+        return true;
+    }
+
+    public static synchronized boolean addToSlot(int slot, int itemId, int amount) {
+        validateSlot(slot);
+        validateItem(itemId, amount);
+        if (ITEM_IDS[slot] != EMPTY_ITEM_ID && ITEM_IDS[slot] != itemId) {
+            return false;
+        }
+
+        ITEM_IDS[slot] = itemId;
+        COUNTS[slot] += amount;
+        return true;
+    }
+
+    public static synchronized boolean remove(int itemId, int amount) {
+        validateItem(itemId, amount);
+        if (!contains(itemId, amount)) {
+            return false;
+        }
+
+        int remaining = amount;
+        for (int slot = 0; slot < TOTAL_SLOT_COUNT && remaining > 0; slot++) {
+            if (ITEM_IDS[slot] != itemId) {
+                continue;
+            }
+            int removed = Math.min(COUNTS[slot], remaining);
+            COUNTS[slot] -= removed;
+            remaining -= removed;
+            clearIfEmpty(slot);
         }
         return true;
     }
 
-    public static synchronized boolean contains(int itemId, int amount) {
-        if (itemId < 0 || amount <= 0) {
+    public static synchronized boolean removeFromSlot(int slot, int itemId, int amount) {
+        validateSlot(slot);
+        validateItem(itemId, amount);
+        if (ITEM_IDS[slot] != itemId || COUNTS[slot] < amount) {
             return false;
         }
-        Integer current = COUNTS.get(Integer.valueOf(itemId));
-        return current != null && current.intValue() >= amount;
+
+        COUNTS[slot] -= amount;
+        clearIfEmpty(slot);
+        return true;
+    }
+
+    public static synchronized int itemIdAt(int slot) {
+        validateSlot(slot);
+        return ITEM_IDS[slot];
+    }
+
+    public static synchronized int countAt(int slot) {
+        validateSlot(slot);
+        return COUNTS[slot];
+    }
+
+    public static synchronized boolean isEmpty(int slot) {
+        validateSlot(slot);
+        return ITEM_IDS[slot] == EMPTY_ITEM_ID;
     }
 
     public static synchronized int count(int itemId) {
-        Integer count = COUNTS.get(Integer.valueOf(itemId));
-        return count == null ? 0 : count.intValue();
-    }
-
-    /** Returns occupied item IDs in stable numeric order for inventory screens. */
-    public static synchronized int[] itemIds() {
-        int[] itemIds = new int[COUNTS.size()];
-        int index = 0;
-        for (Map.Entry<Integer, Integer> entry : COUNTS.entrySet()) {
-            if (entry.getValue().intValue() > 0) {
-                itemIds[index++] = entry.getKey().intValue();
+        int total = 0;
+        for (int slot = 0; slot < TOTAL_SLOT_COUNT; slot++) {
+            if (ITEM_IDS[slot] == itemId) {
+                total += COUNTS[slot];
             }
         }
-        if (index == itemIds.length) {
-            return itemIds;
+        return total;
+    }
+
+    public static synchronized boolean contains(int itemId, int amount) {
+        return amount > 0 && count(itemId) >= amount;
+    }
+
+    public static synchronized Stack takeStack(int slot) {
+        validateSlot(slot);
+        if (ITEM_IDS[slot] == EMPTY_ITEM_ID) {
+            return null;
         }
-        int[] compact = new int[index];
-        System.arraycopy(itemIds, 0, compact, 0, index);
-        return compact;
+
+        Stack stack = new Stack(ITEM_IDS[slot], COUNTS[slot]);
+        ITEM_IDS[slot] = EMPTY_ITEM_ID;
+        COUNTS[slot] = 0;
+        return stack;
+    }
+
+    /**
+     * Places a complete stack into a slot. Equal stacks merge; a different
+     * existing stack is returned to the caller so it can be swapped back.
+     */
+    public static synchronized Stack placeStack(int slot, Stack incoming) {
+        validateSlot(slot);
+        if (incoming == null) {
+            return null;
+        }
+        if (ITEM_IDS[slot] == EMPTY_ITEM_ID) {
+            ITEM_IDS[slot] = incoming.itemId;
+            COUNTS[slot] = incoming.count;
+            return null;
+        }
+        if (ITEM_IDS[slot] == incoming.itemId) {
+            COUNTS[slot] += incoming.count;
+            return null;
+        }
+
+        Stack displaced = new Stack(ITEM_IDS[slot], COUNTS[slot]);
+        ITEM_IDS[slot] = incoming.itemId;
+        COUNTS[slot] = incoming.count;
+        return displaced;
+    }
+
+    public static synchronized void swapSlots(int first, int second) {
+        validateSlot(first);
+        validateSlot(second);
+        int itemId = ITEM_IDS[first];
+        int count = COUNTS[first];
+        ITEM_IDS[first] = ITEM_IDS[second];
+        COUNTS[first] = COUNTS[second];
+        ITEM_IDS[second] = itemId;
+        COUNTS[second] = count;
     }
 
     static synchronized void clearForTests() {
-        COUNTS.clear();
+        Arrays.fill(ITEM_IDS, EMPTY_ITEM_ID);
+        Arrays.fill(COUNTS, 0);
     }
 
-    private static void requireValid(int itemId, int amount) {
+    private static int findItem(int itemId) {
+        for (int slot = 0; slot < TOTAL_SLOT_COUNT; slot++) {
+            if (ITEM_IDS[slot] == itemId) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    private static int findEmpty(int start, int end) {
+        for (int slot = start; slot < end; slot++) {
+            if (ITEM_IDS[slot] == EMPTY_ITEM_ID) {
+                return slot;
+            }
+        }
+        return -1;
+    }
+
+    private static void clearIfEmpty(int slot) {
+        if (COUNTS[slot] == 0) {
+            ITEM_IDS[slot] = EMPTY_ITEM_ID;
+        }
+    }
+
+    private static void validateSlot(int slot) {
+        if (slot < 0 || slot >= TOTAL_SLOT_COUNT) {
+            throw new IllegalArgumentException("Inventory slot out of range: " + slot);
+        }
+    }
+
+    private static void validateItem(int itemId, int amount) {
         if (itemId < 0) {
-            throw new IllegalArgumentException("Item IDs cannot be negative: " + itemId);
+            throw new IllegalArgumentException("Item ID must not be negative: " + itemId);
         }
         if (amount <= 0) {
-            throw new IllegalArgumentException("Inventory amount must be positive: " + amount);
+            throw new IllegalArgumentException("Amount must be positive: " + amount);
+        }
+    }
+
+    public static final class Stack {
+        public final int itemId;
+        public final int count;
+
+        public Stack(int itemId, int count) {
+            validateItem(itemId, count);
+            this.itemId = itemId;
+            this.count = count;
         }
     }
 }
