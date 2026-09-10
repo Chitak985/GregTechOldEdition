@@ -180,7 +180,30 @@ public final class TransformerVerification {
                         GuiManager.recipeFor(new int[] {10, 10, -1, -1}),
                         new int[] {-1, 0}),
                 "Horizontal planks must not match the stick recipe");
+        require(Arrays.equals(
+                        GuiManager.recipeFor(new int[] {20, -1, 20, 20}),
+                        new int[] {106, 1}),
+                "Three gravel should craft one flint regardless of position");
+        require(Arrays.equals(
+                        GuiManager.recipeFor(new int[] {106, 106, 10, 10}),
+                        new int[] {28, 1}),
+                "Two flint over two planks should craft one crafting table");
+        require(Arrays.equals(
+                        GuiManager.recipeFor(new int[] {
+                            -1, -1, -1,
+                            -1, 106, 106,
+                            -1, 10, 10
+                        }),
+                        new int[] {28, 1}),
+                "The crafting-table pattern should work anywhere in a 3x3 grid");
+        require(Arrays.equals(
+                        GuiManager.recipeFor(new int[] {10, 10, 106, 106}),
+                        new int[] {-1, 0}),
+                "The crafting-table recipe must keep flint above planks");
         require("Stick".equals(ItemCatalog.itemName(100)), "Item ID 100 should be Stick");
+        require("Flint".equals(ItemCatalog.itemName(106)), "Item ID 106 should be Flint");
+        require("Crafting Table".equals(ItemCatalog.blockName(28)),
+                "Block ID 28 should be Crafting Table");
 
         // Moving a stack targets exact slots rather than rebuilding a sorted item list.
         Inventory.clearForTests();
@@ -218,6 +241,39 @@ public final class TransformerVerification {
         require(Inventory.count(100) == 2,
                 "Two vertical planks should produce two sticks");
         GuiManager.handleKeyEvent(18, true);
+
+        // Craft the table in the player's 2x2 screen using the shaped AA/BB recipe.
+        Inventory.clearForTests();
+        Inventory.addToSlot(Inventory.HOTBAR_START, 106, 2);
+        Inventory.addToSlot(Inventory.HOTBAR_START + 1, 10, 2);
+        GuiManager.handleKeyEvent(18, true);
+        drag(395, 742, 440, 320);
+        drag(395, 742, 472, 320);
+        drag(423, 742, 440, 352);
+        drag(423, 742, 472, 352);
+        click(530, 332);
+        require(Inventory.count(106) == 0 && Inventory.count(10) == 0,
+                "Crafting a table should consume two flint and two planks");
+        require(Inventory.count(CraftingTableGui.BLOCK_ID) == 1,
+                "The AA/BB recipe should produce one crafting table");
+        GuiManager.handleKeyEvent(18, true);
+
+        // The crafted block opens its own 3x3 UI and supports shapeless recipes.
+        Inventory.add(20, 3);
+        require(BlockGuiRegistry.openForBlock(CraftingTableGui.BLOCK_ID),
+                "The crafting table should be registered as an interactive block");
+        require(GuiManager.isCraftingTableOpen(),
+                "The crafting table should open the dedicated 3x3 GUI type");
+        drag(423, 742, 424, 320);
+        drag(423, 742, 488, 320);
+        drag(423, 742, 456, 352);
+        click(550, 352);
+        require(Inventory.count(20) == 0,
+                "The shapeless gravel recipe should consume three gravel");
+        require(Inventory.count(106) == 1,
+                "The 3x3 crafting table should produce one flint from gravel");
+        GuiManager.handleKeyEvent(18, true);
+        require(!GuiManager.isOpen(), "E should close the crafting-table GUI");
 
         BlockSelection.handleKeyEvent(3, true);
         int selectionBeforeGui = BlockSelection.selectedHotbarIndex();

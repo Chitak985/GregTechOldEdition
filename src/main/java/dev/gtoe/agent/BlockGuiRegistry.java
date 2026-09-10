@@ -11,6 +11,7 @@ public final class BlockGuiRegistry {
     // All the GUI definitions as block ID: definition
     private static final Map<Integer, Definition> DEFINITIONS =
             new HashMap<>();
+    private static final Set<Integer> CRAFTING_TABLES = new HashSet<>();
 
     static {
         // Add block GUIs here
@@ -27,6 +28,7 @@ public final class BlockGuiRegistry {
                                 140,
                                 28)
                 ));
+        registerCraftingTable(CraftingTableGui.BLOCK_ID);
     }
 
     private BlockGuiRegistry() {
@@ -41,8 +43,21 @@ public final class BlockGuiRegistry {
         DEFINITIONS.put(blockId, new Definition(texts, buttons));
     }
 
+    /** Registers the dedicated crafting-table GUI type for a block. */
+    public static synchronized void registerCraftingTable(int blockId) {
+        if (!ItemCatalog.isBlock(blockId)) {
+            throw new IllegalArgumentException(
+                    "BlockGuiRegistry/registerCraftingTable: Invalid block ID " + blockId);
+        }
+        CRAFTING_TABLES.add(Integer.valueOf(blockId));
+    }
+
     // Called if a block is right-clicked to open a GUI
     public static synchronized boolean openForBlock(int blockId) {
+        if (CRAFTING_TABLES.contains(Integer.valueOf(blockId))) {
+            CraftingTableGui.open();
+            return true;
+        }
         Definition definition = DEFINITIONS.get(blockId);  // Get the block's GUI definition
         if (definition == null) {  // Skip if it has no GUI
             return false;

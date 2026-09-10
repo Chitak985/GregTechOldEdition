@@ -21,7 +21,7 @@ dependencies {
 def generatedAgentResources = layout.buildDirectory.dir('generated/agent-resources')
 
 tasks.register('generateTerrainTexture') {
-    description = 'Generates the GTOE 19-texture terrain atlas.'
+    description = 'Generates the GTOE 28-texture terrain atlas.'
     def outputFile = generatedAgentResources.map { it.file('gtoe-terrain.png') }
     outputs.file(outputFile)
 
@@ -120,6 +120,28 @@ tasks.register('generateTerrainTexture') {
             }
         }
 
+        def speckled = { int blockId, int base, int light, int dark, int salt ->
+            int baseR = (base >>> 16) & 255
+            int baseG = (base >>> 8) & 255
+            int baseB = base & 255
+            for (int py = 0; py < 16; py++) {
+                for (int px = 0; px < 16; px++) {
+                    int hash = px * 47 + py * 71 + px * py * 11 + salt
+                    int variation = (hash & 15) - 7
+                    int red = Math.max(0, Math.min(255, baseR + variation))
+                    int green = Math.max(0, Math.min(255, baseG + variation))
+                    int blue = Math.max(0, Math.min(255, baseB + variation))
+                    int color = (0xFF << 24) | (red << 16) | (green << 8) | blue
+                    if (hash % 29 == 0 || hash % 31 == 1) {
+                        color = light
+                    } else if (hash % 23 == 2 || hash % 37 == 3) {
+                        color = dark
+                    }
+                    atlasPixel(blockId, px, py, color)
+                }
+            }
+        }
+
         casing(11, 0xFF9B6338 as int, 0xFFD39A5E as int, 0xFF4F2D1B as int) // bronze
         casing(12, 0xFF747B82 as int, 0xFFB8C0C7 as int, 0xFF343A40 as int) // steel
         casing(13, 0xFFBBC2C7 as int, 0xFFF1F4F5 as int, 0xFF687078 as int) // aluminium
@@ -138,6 +160,88 @@ tasks.register('generateTerrainTexture') {
                     color = ((px + py) % 3 == 0) ? 0xFF79F2E0 as int : 0xFF2B7F84 as int
                 }
                 atlasPixel(19, px, py, color)
+            }
+        }
+
+        // 20: gravel and 21: reinforced/hardened stone.
+        speckled(20, 0xFF8A8175 as int, 0xFFB5AA9A as int, 0xFF554E48 as int, 20)
+        speckled(21, 0xFF58616A as int, 0xFF87929C as int, 0xFF30373D as int, 21)
+        for (int py = 0; py < 16; py++) {
+            for (int px = 0; px < 16; px++) {
+                if (py == 0 || py == 7 || py == 15
+                        || (py < 7 && px == 7)
+                        || (py > 7 && (px == 3 || px == 11))) {
+                    atlasPixel(21, px, py, 0xFF343A40 as int)
+                }
+            }
+        }
+
+        // 22-24: steel-framed furnace hatches with distinct face markings.
+        casing(22, 0xFF626A70 as int, 0xFFADB5BA as int, 0xFF2F353A as int)
+        casing(23, 0xFF4B555B as int, 0xFF9CA8AE as int, 0xFF252B2F as int)
+        casing(24, 0xFF5B4435 as int, 0xFF9B765C as int, 0xFF2C211B as int)
+        for (int py = 4; py <= 11; py++) {
+            for (int px = 4; px <= 11; px++) {
+                int mainHatch = (px == 4 || px == 11 || py == 4 || py == 11)
+                        ? 0xFF171A1C as int
+                        : (((px + py) & 1) == 0 ? 0xFFB84D24 as int : 0xFF652615 as int)
+                atlasPixel(22, px, py, mainHatch)
+
+                int exhaust = (px == 4 || px == 7 || px == 10)
+                        ? 0xFF15191B as int
+                        : 0xFF707C82 as int
+                atlasPixel(23, px, py, exhaust)
+
+                int fuelHatch = (py >= 6 && py <= 9)
+                        ? 0xFF171310 as int
+                        : 0xFF6E4B35 as int
+                if (px == 10 && py == 8) {
+                    fuelHatch = 0xFFD6903D as int
+                }
+                atlasPixel(24, px, py, fuelHatch)
+            }
+        }
+
+        // 25-26: refractory fuel and main furnace chamber blocks.
+        speckled(25, 0xFF40342D as int, 0xFF71584A as int, 0xFF241D19 as int, 25)
+        speckled(26, 0xFF4A3A32 as int, 0xFF765344 as int, 0xFF241B17 as int, 26)
+        for (int py = 0; py < 16; py++) {
+            for (int px = 0; px < 16; px++) {
+                if (py == 0 || py == 7 || py == 15
+                        || (py < 7 && px == 7)
+                        || (py > 7 && (px == 3 || px == 11))) {
+                    atlasPixel(25, px, py, 0xFF211A17 as int)
+                }
+                if ((px + py * 2) % 17 == 0 || (px * 3 + py) % 29 == 0) {
+                    atlasPixel(26, px, py,
+                            ((px + py) & 1) == 0 ? 0xFFE7792D as int : 0xFF8F321B as int)
+                }
+            }
+        }
+
+        // 27: cupronickel coil block.
+        speckled(27, 0xFF392D29 as int, 0xFF66504A as int, 0xFF1D1715 as int, 27)
+        for (int py = 1; py < 15; py++) {
+            for (int px = 2; px < 14; px++) {
+                if (py == 3 || py == 4 || py == 7 || py == 8 || py == 11 || py == 12) {
+                    int coilColor = ((px + py) & 1) == 0
+                            ? 0xFFD58A58 as int : 0xFF8F4B32 as int
+                    atlasPixel(27, px, py, coilColor)
+                }
+            }
+        }
+
+        // 28: crafting table, represented by a bordered wooden work grid.
+        speckled(28, 0xFF9B6A3F as int, 0xFFC58D55 as int, 0xFF5C3924 as int, 28)
+        for (int py = 0; py < 16; py++) {
+            for (int px = 0; px < 16; px++) {
+                if (px == 0 || py == 0 || px == 15 || py == 15) {
+                    atlasPixel(28, px, py, 0xFF4A2C1C as int)
+                } else if (px == 5 || px == 10 || py == 5 || py == 10) {
+                    atlasPixel(28, px, py, 0xFF6B452D as int)
+                } else if ((px == 2 || px == 13) && (py == 2 || py == 13)) {
+                    atlasPixel(28, px, py, 0xFFD4B27A as int)
+                }
             }
         }
 

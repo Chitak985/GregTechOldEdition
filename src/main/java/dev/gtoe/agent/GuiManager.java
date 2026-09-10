@@ -14,10 +14,11 @@ public final class GuiManager {
     private static final int SCREEN_NONE = 0;
     private static final int SCREEN_CRAFTING = 1;
     private static final int SCREEN_DEFINITION = 2;
+    private static final int SCREEN_CRAFTING_TABLE = 3;
     private static final int KEY_E = 18;
     private static final int LEFT_MOUSE_BUTTON = 0;
 
-    private static final int[] CRAFTING_GRID = {-1, -1, -1, -1};
+    private static final int[] PLAYER_CRAFTING_GRID = {-1, -1, -1, -1};
 
     private static int screen;
     private static int draggedItemId = Inventory.EMPTY_ITEM_ID;
@@ -49,7 +50,7 @@ public final class GuiManager {
         }
 
         if (keyCode == KEY_E) {
-            if (screen == SCREEN_CRAFTING) {
+            if (screen != SCREEN_NONE) {
                 closeInternal();
             } else {
                 returnCraftingItems();
@@ -68,6 +69,19 @@ public final class GuiManager {
         screen = SCREEN_DEFINITION;
         screen_definition = definition;
         setMouseGrabbed(false);
+    }
+
+    /** Opens the crafting table's dedicated 3x3 screen. */
+    public static synchronized void openCraftingTable() {
+        returnCraftingItems();
+        screen = SCREEN_CRAFTING_TABLE;
+        screen_definition = null;
+        scrollRow = 0;
+        setMouseGrabbed(false);
+    }
+
+    static synchronized boolean isCraftingTableOpen() {
+        return screen == SCREEN_CRAFTING_TABLE;
     }
 
     public static synchronized void close() {
@@ -91,7 +105,7 @@ public final class GuiManager {
             return;
         }
 
-        if (screen == SCREEN_CRAFTING && wheel != 0) {
+        if (isCraftingScreen() && wheel != 0) {
             int maxScroll = Math.max(0, Inventory.MAIN_ROWS - 3);
             if (wheel < 0) {
                 scrollRow = Math.min(maxScroll, scrollRow + 1);
@@ -104,7 +118,7 @@ public final class GuiManager {
             return;
         }
 
-        Layout layout = new Layout(screenWidth, screenHeight);
+        Layout layout = new Layout(screenWidth, screenHeight, activeGridWidth());
         if (screen == SCREEN_DEFINITION) {
             if (pressed) {
                 for (GUIButton buttonDefinition : screen_definition.buttons) {
@@ -140,14 +154,14 @@ public final class GuiManager {
             return;
         }
 
-        Layout layout = new Layout(screenWidth, screenHeight);
+        Layout layout = new Layout(screenWidth, screenHeight, activeGridWidth());
         GuiGraphics.drawPanel(layout.panelX, layout.panelY, layout.panelWidth, layout.panelHeight);
         if (screen == SCREEN_DEFINITION) {
             screen_definition.render(layout);
             return;
         }
 
-        renderCrafting(layout);
+        renderCrafting(layout, activeCraftingGrid());
     }
 
     /** Draws the selected nine-slot hotbar even when no GUI screen is open. */
@@ -182,37 +196,9 @@ public final class GuiManager {
         }
     }
 
-    /** Returns {output ID, amount}, or {-1, 0} when the supplied 2x2 grid has no recipe. */
+    /** Returns {output ID, amount} for a 2x2 or 3x3 grid, or {-1, 0}. */
     static int[] recipeFor(int[] grid) {
-        if (grid == null || grid.length != 4) {
-            return new int[] {-1, 0};
-        }
-
-        int occupied = 0;
-        int wood = 0;
-        for (int itemId : grid) {
-            if (itemId >= 0) {
-                occupied++;
-            }
-            if (itemId == 9) {
-                wood++;
-            }
-        }
-        if (occupied == 1 && wood == 1) {
-            return new int[] {10, 2};
-        }
-
-        boolean leftColumn = grid[0] == 10
-                && grid[2] == 10
-                && grid[1] < 0 && grid[3] < 0;
-        boolean rightColumn = grid[1] == 10
-                && grid[3] == 10
-                && grid[0] < 0 && grid[2] < 0;
-        if (leftColumn || rightColumn) {
-            return new int[] {100, 2};
-        }
-
-        return new int[] {-1, 0};
+        return CraftingRecipes.recipeFor(grid);
     }
 
     static synchronized void resetForTests() {
@@ -224,6 +210,7 @@ public final class GuiManager {
     }
 
     private static void beginCraftingDrag(Layout layout) {
+        int[] craftingGrid = activeCraftingGrid();
         if (layout.isInOutput(mouseX, mouseY)) {
             craftCurrentRecipe();
             return;
@@ -233,11 +220,11 @@ public final class GuiManager {
         }
 
         int gridIndex = layout.gridIndexAt(mouseX, mouseY);
-        if (gridIndex >= 0 && CRAFTING_GRID[gridIndex] >= 0) {
-            draggedItemId = CRAFTING_GRID[gridIndex];
+        if (gridIndex >= 0 && craftingGrid[gridIndex] >= 0) {
+            draggedItemId = craftingGrid[gridIndex];
             draggedAmount = 1;
             draggedSourceCraftSlot = gridIndex;
-            CRAFTING_GRID[gridIndex] = Inventory.EMPTY_ITEM_ID;
+            craftingGrid[gridIndex] = Inventory.EMPTY_ITEM_ID;
             return;
         }
 
@@ -273,18 +260,19 @@ public final class GuiManager {
     }
 
     private static void dropOnCraftingSlot(int gridIndex) {
+        int[] craftingGrid = activeCraftingGrid();
         if (draggedSourceCraftSlot >= 0) {
-            int displaced = CRAFTING_GRID[gridIndex];
-            CRAFTING_GRID[gridIndex] = draggedItemId;
+            int displaced = craftingGrid[gridIndex];
+            craftingGrid[gridIndex] = draggedItemId;
             if (gridIndex != draggedSourceCraftSlot) {
-                CRAFTING_GRID[draggedSourceCraftSlot] = displaced;
+                craftingGrid[draggedSourceCraftSlot] = displaced;
             }
             clearDragged();
             return;
         }
 
-        if (CRAFTING_GRID[gridIndex] < 0) {
-            CRAFTING_GRID[gridIndex] = draggedItemId;
+        if (craftingGrid[gridIndex] < 0) {
+            craftingGrid[gridIndex] = draggedItemId;
             draggedAmount--;
             if (draggedAmount > 0) {
                 Inventory.placeStack(
@@ -318,20 +306,23 @@ public final class GuiManager {
         clearDragged();
     }
 
-    private static void renderCrafting(Layout layout) {
-        GuiGraphics.drawTextNormal("CRAFTING", layout.panelX + 16, layout.panelY + 14);
-        GuiGraphics.drawTextSmall("DRAG ITEMS TO THE 2X2 GRID", layout.panelX + 16, layout.panelY + 34);
+    private static void renderCrafting(Layout layout, int[] craftingGrid) {
+        String title = screen == SCREEN_CRAFTING_TABLE ? "CRAFTING TABLE" : "CRAFTING";
+        GuiGraphics.drawTextNormal(title, layout.panelX + 16, layout.panelY + 14);
+        GuiGraphics.drawTextSmall(
+                "DRAG ITEMS TO THE " + layout.gridColumns + "X" + layout.gridColumns + " GRID",
+                layout.panelX + 16, layout.panelY + 34);
 
-        for (int index = 0; index < CRAFTING_GRID.length; index++) {
-            int x = layout.gridX + (index % 2) * layout.gridPitch;
-            int y = layout.gridY + (index / 2) * layout.gridPitch;
+        for (int index = 0; index < craftingGrid.length; index++) {
+            int x = layout.gridX + (index % layout.gridColumns) * layout.gridPitch;
+            int y = layout.gridY + (index / layout.gridColumns) * layout.gridPitch;
             GuiGraphics.drawSlot(x, y, layout.craftSlotSize, false);
-            if (CRAFTING_GRID[index] >= 0) {
-                GuiGraphics.drawItemIcon(CRAFTING_GRID[index], 1, x, y, layout.craftSlotSize);
+            if (craftingGrid[index] >= 0) {
+                GuiGraphics.drawItemIcon(craftingGrid[index], 1, x, y, layout.craftSlotSize);
             }
         }
 
-        int[] recipe = recipeFor(CRAFTING_GRID);
+        int[] recipe = recipeFor(craftingGrid);
         GuiGraphics.drawTextSmall("OUTPUT", layout.outputX - 3, layout.outputY - 11);
         GuiGraphics.drawSlot(layout.outputX, layout.outputY, layout.craftSlotSize, recipe[0] >= 0);
         if (recipe[0] >= 0) {
@@ -369,11 +360,12 @@ public final class GuiManager {
     }
 
     private static void craftCurrentRecipe() {
-        int[] recipe = recipeFor(CRAFTING_GRID);
+        int[] craftingGrid = activeCraftingGrid();
+        int[] recipe = recipeFor(craftingGrid);
         if (recipe[0] < 0 || !Inventory.add(recipe[0], recipe[1])) {
             return;
         }
-        Arrays.fill(CRAFTING_GRID, Inventory.EMPTY_ITEM_ID);
+        Arrays.fill(craftingGrid, Inventory.EMPTY_ITEM_ID);
         System.out.println("[gtoe] Crafted " + recipe[1] + " "
                 + ItemCatalog.itemName(recipe[0]));
     }
@@ -389,10 +381,15 @@ public final class GuiManager {
         if (draggedItemId >= 0) {
             returnDraggedToSource();
         }
-        for (int index = 0; index < CRAFTING_GRID.length; index++) {
-            if (CRAFTING_GRID[index] >= 0) {
-                Inventory.add(CRAFTING_GRID[index], 1);
-                CRAFTING_GRID[index] = Inventory.EMPTY_ITEM_ID;
+        returnGridItems(PLAYER_CRAFTING_GRID);
+        returnGridItems(CraftingTableGui.grid());
+    }
+
+    private static void returnGridItems(int[] craftingGrid) {
+        for (int index = 0; index < craftingGrid.length; index++) {
+            if (craftingGrid[index] >= 0) {
+                Inventory.add(craftingGrid[index], 1);
+                craftingGrid[index] = Inventory.EMPTY_ITEM_ID;
             }
         }
     }
@@ -405,8 +402,9 @@ public final class GuiManager {
             if (displaced != null) {
                 Inventory.add(displaced.itemId, displaced.count);
             }
-        } else if (draggedSourceCraftSlot >= 0 && CRAFTING_GRID[draggedSourceCraftSlot] < 0) {
-            CRAFTING_GRID[draggedSourceCraftSlot] = draggedItemId;
+        } else if (draggedSourceCraftSlot >= 0
+                && activeCraftingGrid()[draggedSourceCraftSlot] < 0) {
+            activeCraftingGrid()[draggedSourceCraftSlot] = draggedItemId;
         } else {
             Inventory.add(draggedItemId, draggedAmount);
         }
@@ -418,6 +416,20 @@ public final class GuiManager {
         draggedAmount = 0;
         draggedSourceInventorySlot = -1;
         draggedSourceCraftSlot = -1;
+    }
+
+    private static boolean isCraftingScreen() {
+        return screen == SCREEN_CRAFTING || screen == SCREEN_CRAFTING_TABLE;
+    }
+
+    private static int activeGridWidth() {
+        return screen == SCREEN_CRAFTING_TABLE ? CraftingTableGui.GRID_WIDTH : 2;
+    }
+
+    private static int[] activeCraftingGrid() {
+        return screen == SCREEN_CRAFTING_TABLE
+                ? CraftingTableGui.grid()
+                : PLAYER_CRAFTING_GRID;
     }
 
     private static void setMouseGrabbed(boolean grabbed) {
@@ -439,6 +451,7 @@ public final class GuiManager {
         public final int panelY;
         final int craftSlotSize = 30;
         final int gridPitch = 32;
+        final int gridColumns;
         final int gridX;
         final int gridY;
         final int outputX;
@@ -454,12 +467,17 @@ public final class GuiManager {
         final int hotbarY;
 
         Layout(int screenWidth, int screenHeight) {
+            this(screenWidth, screenHeight, 2);
+        }
+
+        Layout(int screenWidth, int screenHeight, int gridColumns) {
+            this.gridColumns = gridColumns;
             panelX = Math.max(4, (screenWidth - panelWidth) / 2);
             panelY = Math.max(20, (screenHeight - panelHeight) / 2);
-            gridX = panelX + 70;
+            gridX = panelX + (gridColumns == 3 ? 54 : 70);
             gridY = panelY + 58;
-            outputX = gridX + 94;
-            outputY = gridY + 16;
+            outputX = gridX + gridColumns * gridPitch + 30;
+            outputY = gridY + (gridColumns - 1) * gridPitch / 2;
             inventoryX = panelX + 40;
             inventoryY = panelY + 180;
             hotbarX = Math.max(4, (screenWidth - hotbarWidth) / 2);
@@ -467,9 +485,9 @@ public final class GuiManager {
         }
 
         int gridIndexAt(int x, int y) {
-            for (int index = 0; index < CRAFTING_GRID.length; index++) {
-                int slotX = gridX + (index % 2) * gridPitch;
-                int slotY = gridY + (index / 2) * gridPitch;
+            for (int index = 0; index < gridColumns * gridColumns; index++) {
+                int slotX = gridX + (index % gridColumns) * gridPitch;
+                int slotY = gridY + (index / gridColumns) * gridPitch;
                 if (contains(slotX, slotY, craftSlotSize, craftSlotSize, x, y)) {
                     return index;
                 }

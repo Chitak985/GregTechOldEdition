@@ -559,7 +559,8 @@ final class GtoeTransformer implements ClassFileTransformer {
 
         require(initialized[0], "Tile.<clinit>()V was not patched");
         require(textureCoordinatesPatched[0], "Tile.render texture coordinates were not recognized");
-        System.out.println("[gtoe] Added 19 ID-addressable, multi-row block textures to Tile");
+        System.out.println("[gtoe] Added " + TerrainLayers.MAX_BLOCK_ID
+                + " ID-addressable, multi-row block textures to Tile");
         return writer.toByteArray();
     }
 

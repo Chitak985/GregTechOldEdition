@@ -58,6 +58,7 @@ public final class ItemCatalog {
             case 25: return "Furnace Fuel Chamber";
             case 26: return "Furnace Main Chamber";
             case 27: return "Cupronickel Coil Block";
+            case 28: return "Crafting Table";
             default: return "Unknown Block";
         }
     }
