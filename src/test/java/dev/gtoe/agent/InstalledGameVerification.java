@@ -343,12 +343,10 @@ public final class InstalledGameVerification {
     }
 
     private static byte[] readEntry(File jar, String entryName) throws IOException {
-        ZipFile zip = new ZipFile(jar);
-        try {
+        try (ZipFile zip = new ZipFile(jar)) {
             ZipEntry entry = zip.getEntry(entryName);
             require(entry != null, "Missing class in game JAR: " + entryName);
-            InputStream input = zip.getInputStream(entry);
-            try {
+            try (InputStream input = zip.getInputStream(entry)) {
                 ByteArrayOutputStream output = new ByteArrayOutputStream();
                 byte[] buffer = new byte[8192];
                 int count;
@@ -356,11 +354,7 @@ public final class InstalledGameVerification {
                     output.write(buffer, 0, count);
                 }
                 return output.toByteArray();
-            } finally {
-                input.close();
             }
-        } finally {
-            zip.close();
         }
     }
 

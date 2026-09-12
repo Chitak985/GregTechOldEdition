@@ -49,6 +49,7 @@ public final class Inventory {
         return true;
     }
 
+    /** Add some amount of the provided item to a specific slot in the inventory. */
     public static synchronized boolean addToSlot(int slot, int itemId, int amount) {
         validateSlot(slot);
         validateItem(itemId, amount);
@@ -61,6 +62,7 @@ public final class Inventory {
         return true;
     }
 
+    /** Remove some amount of the provided item from inventory. */
     public static synchronized boolean remove(int itemId, int amount) {
         validateItem(itemId, amount);
         if (!contains(itemId, amount)) {
@@ -80,6 +82,7 @@ public final class Inventory {
         return true;
     }
 
+    /** Remove an amount of a specific item from an inventory slot. */
     public static synchronized boolean removeFromSlot(int slot, int itemId, int amount) {
         validateSlot(slot);
         validateItem(itemId, amount);
@@ -92,35 +95,43 @@ public final class Inventory {
         return true;
     }
 
+    /** Get the item ID at the provided slot. */
     public static synchronized int itemIdAt(int slot) {
         validateSlot(slot);
         return ITEM_IDS[slot];
     }
 
+    /** Get the item amount at the provided slot. */
     public static synchronized int countAt(int slot) {
         validateSlot(slot);
         return COUNTS[slot];
     }
 
+    /** Check if the slot is empty. */
     public static synchronized boolean isEmpty(int slot) {
         validateSlot(slot);
         return ITEM_IDS[slot] == EMPTY_ITEM_ID;
     }
 
+    /** Count the total amount of an item ID in the inventory. */
     public static synchronized int count(int itemId) {
         int total = 0;
-        for (int slot = 0; slot < TOTAL_SLOT_COUNT; slot++) {
-            if (ITEM_IDS[slot] == itemId) {
+        for (int slot = 0; slot < TOTAL_SLOT_COUNT; slot++)
+            if (ITEM_IDS[slot] == itemId)
                 total += COUNTS[slot];
-            }
-        }
         return total;
     }
 
+    /** Check if the inventory contains that much of the provided item. */
     public static synchronized boolean contains(int itemId, int amount) {
         return amount > 0 && count(itemId) >= amount;
     }
+    /** Check if the inventory contains at least one of the provided item. */
+    public static synchronized boolean contains(int itemId) {
+        return count(itemId) >= 1;
+    }
 
+    /** Take a full stack of an item from an inventory slot. */
     public static synchronized Stack takeStack(int slot) {
         validateSlot(slot);
         if (ITEM_IDS[slot] == EMPTY_ITEM_ID) {
@@ -158,6 +169,7 @@ public final class Inventory {
         return displaced;
     }
 
+    /** Swap two inventory slots between each other. */
     public static synchronized void swapSlots(int first, int second) {
         validateSlot(first);
         validateSlot(second);

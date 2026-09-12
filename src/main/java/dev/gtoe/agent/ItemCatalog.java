@@ -24,6 +24,7 @@ public final class ItemCatalog {
             case 104: return "Tin Ingot";
             case 105: return "Bronze Ingot";
             case 106: return "Flint";
+            case 107: return "Stone-Reinforced Stick";
             default: return "Unknown Item";
         }
     }

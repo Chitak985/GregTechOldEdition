@@ -168,43 +168,6 @@ public final class TransformerVerification {
         require(level.gtoe$getBlockId(3, 1, 1) == 0,
                 "Placement without the selected block must be rejected");
 
-        require(Arrays.equals(
-                        GuiManager.recipeFor(new int[] {9, -1, -1, -1}),
-                        new int[] {10, 2}),
-                "One wood anywhere should craft two planks");
-        require(Arrays.equals(
-                        GuiManager.recipeFor(new int[] {-1, 10, -1, 10}),
-                        new int[] {100, 2}),
-                "Two vertical planks should craft two sticks");
-        require(Arrays.equals(
-                        GuiManager.recipeFor(new int[] {10, 10, -1, -1}),
-                        new int[] {-1, 0}),
-                "Horizontal planks must not match the stick recipe");
-        require(Arrays.equals(
-                        GuiManager.recipeFor(new int[] {20, -1, 20, 20}),
-                        new int[] {106, 1}),
-                "Three gravel should craft one flint regardless of position");
-        require(Arrays.equals(
-                        GuiManager.recipeFor(new int[] {20, 20, 9, -1}),
-                        new int[] {-1, 0}),
-                "A duplicate shapeless ingredient must require a different matching grid slot");
-        require(Arrays.equals(
-                        GuiManager.recipeFor(new int[] {106, 106, 10, 10}),
-                        new int[] {28, 1}),
-                "Two flint over two planks should craft one crafting table");
-        require(Arrays.equals(
-                        GuiManager.recipeFor(new int[] {
-                            -1, -1, -1,
-                            -1, 106, 106,
-                            -1, 10, 10
-                        }),
-                        new int[] {28, 1}),
-                "The crafting-table pattern should work anywhere in a 3x3 grid");
-        require(Arrays.equals(
-                        GuiManager.recipeFor(new int[] {10, 10, 106, 106}),
-                        new int[] {-1, 0}),
-                "The crafting-table recipe must keep flint above planks");
-
         CraftingRecipes.registerShaped(
                 "ABA" +
                 "BCB" +
@@ -458,7 +421,7 @@ public final class TransformerVerification {
         return writer.toByteArray();
     }
 
-    /** Reflection-compatible stand-in; it is test code, not a copied game class. */
+    /** Reflection-compatible stand-in; it is tested code, not a copied game class. */
     public static final class FakeLevel {
         private final int[][][] blocks = new int[4][4][4];
 

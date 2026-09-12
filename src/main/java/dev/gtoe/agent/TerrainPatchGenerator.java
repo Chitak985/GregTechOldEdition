@@ -4,9 +4,6 @@ import java.util.Random;
 
 /** Generates irregular patches of surface blocks. */
 public final class TerrainPatchGenerator {
-    public static final int SAND_BLOCK_ID = 6;
-    public static final int GRAVEL_BLOCK_ID = 20;
-
     private static final int MIN_RADIUS = 2;
     private static final int MAX_RADIUS = 5;
 
@@ -32,9 +29,11 @@ public final class TerrainPatchGenerator {
             int radius = MIN_RADIUS
                     + random.nextInt(MAX_RADIUS - MIN_RADIUS + 1);
 
+            // Fill the patch with either sand or gravel
+            // This has a 50/50 chance
             int blockId = random.nextBoolean()
-                    ? SAND_BLOCK_ID
-                    : GRAVEL_BLOCK_ID;
+                    ? 6
+                    : 20;
 
             generatePatch(
                     blocks,

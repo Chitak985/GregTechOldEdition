@@ -49,12 +49,12 @@ public final class BlockGuiRegistry {
             throw new IllegalArgumentException(
                     "BlockGuiRegistry/registerCraftingTable: Invalid block ID " + blockId);
         }
-        CRAFTING_TABLES.add(Integer.valueOf(blockId));
+        CRAFTING_TABLES.add(blockId);
     }
 
     // Called if a block is right-clicked to open a GUI
     public static synchronized boolean openForBlock(int blockId) {
-        if (CRAFTING_TABLES.contains(Integer.valueOf(blockId))) {
+        if (CRAFTING_TABLES.contains(blockId)) {
             CraftingTableGui.open();
             return true;
         }

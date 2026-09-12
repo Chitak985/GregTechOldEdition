@@ -7,11 +7,16 @@ import java.util.List;
 /** Declarative recipe registry shared by the 2x2 inventory and 3x3 table. */
 public final class CraftingRecipes {
     private static final int[] PLAYER_GRID_POSITIONS = {1, 2, 4, 5};
-    private static final List<Recipe> RECIPES = new ArrayList<Recipe>();
+    /** List of all loaded recipes. */
+    private static final List<Recipe> RECIPES = new ArrayList<>();
 
     static {
+        /* Register all crafting recipes here */
+
+        // Wood -> Planks
         registerShapeless(10, 2, 9);
 
+        // Planks -> Sticks
         registerShaped(
                 "A  " +
                 "A  " +
@@ -19,8 +24,10 @@ public final class CraftingRecipes {
                 100, 2,
                 ingredient('A', 10));
 
+        // Gravel -> Flint
         registerShapeless(106, 1, 20, 20, 20);
 
+        // Crafting Table
         registerShaped(
                 "AA " +
                 "BB " +
@@ -28,12 +35,83 @@ public final class CraftingRecipes {
                 CraftingTableGui.BLOCK_ID, 1,
                 ingredient('A', 106),
                 ingredient('B', 10));
+
+        // Hardened Stone
+        registerShaped(
+                "AB " +
+                "BA " +
+                "   ",
+                21, 2,
+                ingredient('A', 3),
+                ingredient('B', 106));
+        registerShaped(
+                "BA " +
+                "AB " +
+                "   ",
+                21, 2,
+                ingredient('A', 3),
+                ingredient('B', 106));
+
+        // Stone-Reinforced Stick
+        registerShaped(
+                "CA " +
+                "BC " +
+                "   ",
+                107, 1,
+                ingredient('A', 100),
+                ingredient('B', 3),
+                ingredient('C', 106));
+
+        // Furnace Main Hatch
+        registerShaped(
+                "AAA" +
+                "ABA" +
+                "AAA",
+                22, 1,
+                ingredient('A', 3),
+                ingredient('B', 107));
+
+        // Furnace Fuel Hatch
+        registerShaped(
+                "AAA" +
+                "CBC" +
+                "AAA",
+                24, 1,
+                ingredient('A', 3),
+                ingredient('B', 107),
+                ingredient('C', 106));
+
+        // Furnace Exhaust
+        registerShaped(
+                "A A" +
+                "A A" +
+                "A A",
+                23, 1,
+                ingredient('A', 21));
+
+        // Furnace Main Chamber
+        registerShaped(
+                "ABA" +
+                "ABA" +
+                "AAA",
+                26, 1,
+                ingredient('A', 21),
+                ingredient('B', 106));
+
+        // Furnace Fuel Chamber
+        registerShaped(
+                "AAA" +
+                "BBB" +
+                "ABA",
+                25, 1,
+                ingredient('A', 21),
+                ingredient('B', 106));
     }
 
     private CraftingRecipes() {
     }
 
-    /** Associates one of the allowed pattern symbols A-I with an item ID. */
+    /** Associates one of the allowed pattern symbols A-Z with an item ID. */
     public static Ingredient ingredient(char symbol, int itemId) {
         requireAllowedSymbol(symbol);
         if (itemId < 0) {
@@ -44,7 +122,9 @@ public final class CraftingRecipes {
 
     /**
      * Adds a shaped recipe expressed as exactly nine characters. Spaces are
-     * empty cells; every other character must be A-I and have an assignment.
+     * empty cells; every other character must be A-Z and have an assignment.
+     * If you have an IDE with parameter hints you should disable them
+     * for this function to make it easier to read the patterns.
      */
     public static synchronized void registerShaped(
             String pattern,
@@ -67,12 +147,12 @@ public final class CraftingRecipes {
                 || ingredientItemIds.length > 9) {
             throw new IllegalArgumentException("Shapeless recipes require 1-9 ingredients");
         }
-        for (int itemId : ingredientItemIds) {
-            if (itemId < 0) {
+
+        for (int itemId : ingredientItemIds)
+            if (itemId < 0)
                 throw new IllegalArgumentException(
-                        "Recipe item IDs cannot be negative: " + itemId);
-            }
-        }
+                    "Recipe item IDs cannot be negative: " + itemId);
+
         RECIPES.add(new ShapelessRecipe(
                 outputItemId, outputAmount, ingredientItemIds));
     }
@@ -80,53 +160,48 @@ public final class CraftingRecipes {
     /** Returns {output ID, amount}, or {-1, 0} when no recipe matches. */
     static synchronized int[] recipeFor(int[] grid) {
         int[] fullGrid = asThreeByThree(grid);
-        if (fullGrid == null) {
+        if (fullGrid == null)
             return noRecipe();
-        }
 
-        for (Recipe recipe : RECIPES) {
-            if (recipe.matches(fullGrid)) {
+        for (Recipe recipe : RECIPES)
+            if (recipe.matches(fullGrid))
                 return new int[] {recipe.outputItemId, recipe.outputAmount};
-            }
-        }
+
         return noRecipe();
     }
 
     private static int[] asThreeByThree(int[] grid) {
-        if (grid == null) {
+        if (grid == null)
             return null;
-        }
-        if (grid.length == 9) {
+        if (grid.length == 9)
             return Arrays.copyOf(grid, grid.length);
-        }
-        if (grid.length != 4) {
+        if (grid.length != 4)
             return null;
-        }
 
         int[] fullGrid = new int[9];
         Arrays.fill(fullGrid, Inventory.EMPTY_ITEM_ID);
-        for (int index = 0; index < grid.length; index++) {
+        for (int index = 0; index < grid.length; index++)
             fullGrid[PLAYER_GRID_POSITIONS[index]] = grid[index];
-        }
+
         return fullGrid;
     }
 
+    /** Validate recipe output. (ensures item ID exists and amount is positive) */
     private static void validateOutput(int itemId, int amount) {
-        if (itemId < 0) {
+        if (itemId < 0)
             throw new IllegalArgumentException("Recipe output ID cannot be negative: " + itemId);
-        }
-        if (amount <= 0) {
+        if (amount <= 0)
             throw new IllegalArgumentException("Recipe output amount must be positive: " + amount);
-        }
     }
 
+    /** Ensure that the recipe symbol used is an upper-case letter. */
     private static void requireAllowedSymbol(char symbol) {
-        if (symbol < 'A' || symbol > 'I') {
+        if (symbol < 'A' || symbol > 'Z')
             throw new IllegalArgumentException(
-                    "Recipe symbols must be A through I: " + symbol);
-        }
+                    "Recipe symbols must be A through Z: " + symbol);
     }
 
+    /** Return a placeholder empty recipe. */
     private static int[] noRecipe() {
         return new int[] {-1, 0};
     }
@@ -230,10 +305,8 @@ public final class CraftingRecipes {
             shape = new int[shapeWidth * shapeHeight];
             Arrays.fill(shape, Inventory.EMPTY_ITEM_ID);
             for (int row = minRow; row <= maxRow; row++) {
-                for (int column = minColumn; column <= maxColumn; column++) {
-                    shape[(row - minRow) * shapeWidth + column - minColumn]
-                            = expanded[row * 3 + column];
-                }
+                if (maxColumn + 1 - minColumn >= 0)
+                    System.arraycopy(expanded, row * 3 + minColumn, shape, (row - minRow) * shapeWidth + minColumn - minColumn, maxColumn + 1 - minColumn);
             }
         }
 
@@ -241,9 +314,8 @@ public final class CraftingRecipes {
         boolean matches(int[] fullGrid) {
             for (int startRow = 0; startRow <= 3 - shapeHeight; startRow++) {
                 for (int startColumn = 0; startColumn <= 3 - shapeWidth; startColumn++) {
-                    if (matchesAt(fullGrid, startRow, startColumn)) {
+                    if (matchesAt(fullGrid, startRow, startColumn))
                         return true;
-                    }
                 }
             }
             return false;
@@ -259,9 +331,8 @@ public final class CraftingRecipes {
                             && shapeColumn >= 0 && shapeColumn < shapeWidth) {
                         expected = shape[shapeRow * shapeWidth + shapeColumn];
                     }
-                    if (fullGrid[row * 3 + column] != expected) {
+                    if (fullGrid[row * 3 + column] != expected)
                         return false;
-                    }
                 }
             }
             return true;

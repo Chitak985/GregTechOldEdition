@@ -10,6 +10,7 @@ public final class WorldActions {
     private WorldActions() {
     }
 
+    /** Break a block or interact with it at the provided position. Similar to using RMB on a block. */
     public static void breakBlockOrInteract(Object level, int x, int y, int z) {
         if (level == null || GuiManager.blocksWorldAction()) {
             return;
@@ -39,6 +40,7 @@ public final class WorldActions {
         }
     }
 
+    /** Place the provided block ID at the provided position. */
     public static void placeSelectedBlock(Object level, int x, int y, int z, int blockId) {
         if (level == null || GuiManager.blocksWorldAction() || blockId <= 0
                 || !ItemCatalog.isBlock(blockId)) {
@@ -56,12 +58,10 @@ public final class WorldActions {
             reserved = true;
 
             setTile(level, x, y, z, blockId);
-            if (blockIdAt(level, x, y, z) == blockId) {
-                reserved = false;
-            } else {
+            if (blockIdAt(level, x, y, z) != blockId) {
                 restoreReservedBlock(selectedSlot, blockId);
-                reserved = false;
             }
+            reserved = false;
         } catch (Throwable error) {
             if (reserved) {
                 restoreReservedBlock(selectedSlot, blockId);
@@ -76,17 +76,13 @@ public final class WorldActions {
         }
     }
 
+    /** Get the block ID of a block at the provided position. */
     private static int blockIdAt(Object level, int x, int y, int z) throws Exception {
-        Access current = accessFor(level);
-        Object result = current.getBlockId.invoke(level,
-                Integer.valueOf(x), Integer.valueOf(y), Integer.valueOf(z));
-        return ((Integer) result).intValue();
+        return (Integer) accessFor(level).getBlockId.invoke(level, x, y, z);
     }
 
     private static void setTile(Object level, int x, int y, int z, int blockId) throws Exception {
-        Access current = accessFor(level);
-        current.setTile.invoke(level,
-                Integer.valueOf(x), Integer.valueOf(y), Integer.valueOf(z), Integer.valueOf(blockId));
+        accessFor(level).setTile.invoke(level, x, y, z, blockId);
     }
 
     private static Access accessFor(Object level) throws Exception {
@@ -110,6 +106,7 @@ public final class WorldActions {
         }
     }
 
+    /** Report a reflection error. */
     private static void reportReflectionError(Throwable error) {
         if (!reflectionErrorReported) {
             reflectionErrorReported = true;
@@ -118,6 +115,7 @@ public final class WorldActions {
         }
     }
 
+    /** Reset the class for tests. */
     static synchronized void resetForTests() {
         access = null;
         reflectionErrorReported = false;
