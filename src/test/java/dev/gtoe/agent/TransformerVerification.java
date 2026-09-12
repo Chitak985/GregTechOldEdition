@@ -185,6 +185,10 @@ public final class TransformerVerification {
                         new int[] {106, 1}),
                 "Three gravel should craft one flint regardless of position");
         require(Arrays.equals(
+                        GuiManager.recipeFor(new int[] {20, 20, 9, -1}),
+                        new int[] {-1, 0}),
+                "A duplicate shapeless ingredient must require a different matching grid slot");
+        require(Arrays.equals(
                         GuiManager.recipeFor(new int[] {106, 106, 10, 10}),
                         new int[] {28, 1}),
                 "Two flint over two planks should craft one crafting table");
@@ -200,6 +204,31 @@ public final class TransformerVerification {
                         GuiManager.recipeFor(new int[] {10, 10, 106, 106}),
                         new int[] {-1, 0}),
                 "The crafting-table recipe must keep flint above planks");
+
+        CraftingRecipes.registerShaped(
+                "ABA" +
+                "BCB" +
+                "ABA",
+                105, 1,
+                CraftingRecipes.ingredient('A', 7),
+                CraftingRecipes.ingredient('B', 8),
+                CraftingRecipes.ingredient('C', 9));
+        require(Arrays.equals(
+                        GuiManager.recipeFor(new int[] {
+                            7, 8, 7,
+                            8, 9, 8,
+                            7, 8, 7
+                        }),
+                        new int[] {105, 1}),
+                "A declarative nine-symbol shaped recipe should match its item assignments");
+
+        boolean invalidSymbolRejected = false;
+        try {
+            CraftingRecipes.ingredient('J', 1);
+        } catch (IllegalArgumentException expected) {
+            invalidSymbolRejected = true;
+        }
+        require(invalidSymbolRejected, "Shaped recipe symbols after I must be rejected");
         require("Stick".equals(ItemCatalog.itemName(100)), "Item ID 100 should be Stick");
         require("Flint".equals(ItemCatalog.itemName(106)), "Item ID 106 should be Flint");
         require("Crafting Table".equals(ItemCatalog.blockName(28)),

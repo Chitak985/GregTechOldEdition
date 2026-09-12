@@ -19,6 +19,7 @@ public final class GuiManager {
     private static final int LEFT_MOUSE_BUTTON = 0;
 
     private static final int[] PLAYER_CRAFTING_GRID = {-1, -1, -1, -1};
+    private static int[] matchedRecipe = {-1, 0};
 
     private static int screen;
     private static int draggedItemId = Inventory.EMPTY_ITEM_ID;
@@ -56,6 +57,7 @@ public final class GuiManager {
                 returnCraftingItems();
                 screen = SCREEN_CRAFTING;
                 scrollRow = 0;
+                refreshRecipe();
                 setMouseGrabbed(false);
             }
             return true;
@@ -77,6 +79,7 @@ public final class GuiManager {
         screen = SCREEN_CRAFTING_TABLE;
         screen_definition = null;
         scrollRow = 0;
+        refreshRecipe();
         setMouseGrabbed(false);
     }
 
@@ -207,6 +210,7 @@ public final class GuiManager {
         scrollRow = 0;
         currentMouseEventOwnedByGui = false;
         screen_definition = null;
+        matchedRecipe = new int[] {-1, 0};
     }
 
     private static void beginCraftingDrag(Layout layout) {
@@ -225,6 +229,7 @@ public final class GuiManager {
             draggedAmount = 1;
             draggedSourceCraftSlot = gridIndex;
             craftingGrid[gridIndex] = Inventory.EMPTY_ITEM_ID;
+            refreshRecipe();
             return;
         }
 
@@ -267,6 +272,7 @@ public final class GuiManager {
             if (gridIndex != draggedSourceCraftSlot) {
                 craftingGrid[draggedSourceCraftSlot] = displaced;
             }
+            refreshRecipe();
             clearDragged();
             return;
         }
@@ -279,6 +285,7 @@ public final class GuiManager {
                         draggedSourceInventorySlot,
                         new Inventory.Stack(draggedItemId, draggedAmount));
             }
+            refreshRecipe();
             clearDragged();
             return;
         }
@@ -322,7 +329,7 @@ public final class GuiManager {
             }
         }
 
-        int[] recipe = recipeFor(craftingGrid);
+        int[] recipe = matchedRecipe;
         GuiGraphics.drawTextSmall("OUTPUT", layout.outputX - 3, layout.outputY - 11);
         GuiGraphics.drawSlot(layout.outputX, layout.outputY, layout.craftSlotSize, recipe[0] >= 0);
         if (recipe[0] >= 0) {
@@ -361,11 +368,13 @@ public final class GuiManager {
 
     private static void craftCurrentRecipe() {
         int[] craftingGrid = activeCraftingGrid();
-        int[] recipe = recipeFor(craftingGrid);
+        refreshRecipe();
+        int[] recipe = matchedRecipe;
         if (recipe[0] < 0 || !Inventory.add(recipe[0], recipe[1])) {
             return;
         }
         Arrays.fill(craftingGrid, Inventory.EMPTY_ITEM_ID);
+        refreshRecipe();
         System.out.println("[gtoe] Crafted " + recipe[1] + " "
                 + ItemCatalog.itemName(recipe[0]));
     }
@@ -383,6 +392,7 @@ public final class GuiManager {
         }
         returnGridItems(PLAYER_CRAFTING_GRID);
         returnGridItems(CraftingTableGui.grid());
+        matchedRecipe = new int[] {-1, 0};
     }
 
     private static void returnGridItems(int[] craftingGrid) {
@@ -405,6 +415,7 @@ public final class GuiManager {
         } else if (draggedSourceCraftSlot >= 0
                 && activeCraftingGrid()[draggedSourceCraftSlot] < 0) {
             activeCraftingGrid()[draggedSourceCraftSlot] = draggedItemId;
+            refreshRecipe();
         } else {
             Inventory.add(draggedItemId, draggedAmount);
         }
@@ -430,6 +441,12 @@ public final class GuiManager {
         return screen == SCREEN_CRAFTING_TABLE
                 ? CraftingTableGui.grid()
                 : PLAYER_CRAFTING_GRID;
+    }
+
+    private static void refreshRecipe() {
+        matchedRecipe = isCraftingScreen()
+                ? recipeFor(activeCraftingGrid())
+                : new int[] {-1, 0};
     }
 
     private static void setMouseGrabbed(boolean grabbed) {
