@@ -1,12 +1,14 @@
 # GregTech Old Edition
 
-This is GregTech: New Horizons made for Minecraft rd-132211, with a few changes of my own.
+This is my own version of GregTech made for Minecraft RD-132211. It is heavily based on and is inspired by GregTech: New Horizons and GregTech Community Edition.
 It is a standalone Java agent, meaning it does not need recompiling the game to work and works with Prism launcher.
 
 ## Features
-Placing blocks with buttons 1 through 9 and simple layered terrain generation.
-
-Left-clicks will place blocks and right-clicks remove, just like in the original version.
+- Placing blocks by selecting them with buttons 1 through 9 and simple layered terrain generation. (see table below)
+- Left-click will place blocks and right-click remove, just like in the original version.
+- Custom toolbar and inventroy system similar to later Minecraft versions.
+- Crafting and crafting table also recreated from later versions.
+- And more...
 
 World generation table:
 
@@ -37,45 +39,35 @@ instance-specific Java arguments field, and add:
 
 This method will get you the newest version of the mod, but it may be unstable. Download the zip from the main GitHub page and unzip it somewhere.
 
-In the **rd-132211** instance, open **Edit → Settings → Java**, enable the
-instance-specific Java arguments field, and add:
+In the rd-132211 instance, open Edit -> Settings -> Java, enable the instance-specific Java arguments field, and add:
 
 ```
--javaagent: C:\pathToDownloadedZip\GregTechOldEdition-main\build\libs\gtoe.jar
+-javaagent: C:\pathToDownloadedUnzippedZipFolder\GregTechOldEdition-main\build\libs\gtoe.jar
 ```
 
 ## Build
 
 Use this guide if you wish to build the mod yourself.
 
-The Gradle 8.8 wrapper needs JDK 17–22 to run. The produced agent is compiled
-for Java 8, matching the Java runtime Prism assigns to rd-132211.
+The Gradle 8.8 wrapper needs JDK 17–22 to run. The produced agent is compiled for Java 8, matching the Java runtime Prism assigns to rd-132211.
 
-On this Windows machine:
+Set Java home and do a clean build like so:
 
 ```powershell
 $env:JAVA_HOME = 'C:\Program Files\Java\jdk-17'
 .\gradlew.bat clean build
 ```
 
-The standalone agent is created at:
+The mod jar (Java agent) is created at build/libs/gtoe.jar.
 
-```text
-build/libs/gtoe.jar
-```
-
-`build` runs bytecode-level verification using an ASM-generated fixture. The
-additional `verifyInstalledGame` task can structurally verify the transformations
-against an installed client JAR without changing it:
+The verifyInstalledGame task can verify the transformations against a client .jar without changing it:
 
 ```powershell
-.\gradlew.bat verifyInstalledGame `
-  "-PgameJar=C:\path\to\minecraft-rd-132211-client.jar"
+.\gradlew.bat verifyInstalledGame "-PgameJar=C:\path\to\minecraft-rd-132211-client.jar"
 ```
 
-Expected Prism console messages include the configured Y layers, successful
-transformation messages for RubyDung/Level/Tile/Chunk, and:
+If the mos is installed correctly, you should see the following in the log:
 
-```text
+```
 [rd-132211-agent] RubyDung.init() entered
 ```
