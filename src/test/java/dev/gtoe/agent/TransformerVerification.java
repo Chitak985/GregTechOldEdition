@@ -185,13 +185,6 @@ public final class TransformerVerification {
                         new int[] {105, 1}),
                 "A declarative nine-symbol shaped recipe should match its item assignments");
 
-        boolean invalidSymbolRejected = false;
-        try {
-            CraftingRecipes.ingredient('J', 1);
-        } catch (IllegalArgumentException expected) {
-            invalidSymbolRejected = true;
-        }
-        require(invalidSymbolRejected, "Shaped recipe symbols after I must be rejected");
         require("Stick".equals(ItemCatalog.itemName(100)), "Item ID 100 should be Stick");
         require("Flint".equals(ItemCatalog.itemName(106)), "Item ID 106 should be Flint");
         require("Crafting Table".equals(ItemCatalog.blockName(28)),

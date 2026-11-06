@@ -50,8 +50,16 @@ public class MultiblockStructure {
     }
 
     public static HashMap<String, Integer> CreateBlockMapping(List<String> symbols, List<Integer> blocks) {
+        if(symbols.size() != blocks.size()) {
+            System.err.println("[gtoe] Array length mismatch while creating multiblock block mapping!" +
+                               "Returning no mapping instead. The arrays were: " +
+                               "[" + String.join(", ", symbols) + "], [" + String.join(", ", symbols) + "]");
+            return new HashMap<>();
+        }
         HashMap<String, Integer> blockMapping = new HashMap<>();
-
+        for (int i = 0; i < symbols.size(); i++) {
+            blockMapping.put(symbols.get(i), blocks.get(i));
+        }
         return blockMapping;
     }
 }
