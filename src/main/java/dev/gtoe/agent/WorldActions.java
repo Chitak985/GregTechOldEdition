@@ -2,7 +2,7 @@ package dev.gtoe.agent;
 
 import java.lang.reflect.Method;
 
-/** Inventory-aware break/place/interact operations called from transformed RubyDung bytecode. */
+/** Block operations that interact with the inventory. These are usually called from transformed RubyDung bytecode. */
 public final class WorldActions {
     private static volatile Access access;
     private static volatile boolean reflectionErrorReported;
@@ -22,7 +22,7 @@ public final class WorldActions {
                 return;
             }
 
-            // Planks demonstrate the reusable block GUI. Shift preserves access to breaking it.
+            // Open block GUI if not holding shift
             if (!GuiManager.isShiftDown() && BlockGuiRegistry.openForBlock(blockId)) {
                 return;
             }
@@ -77,11 +77,11 @@ public final class WorldActions {
     }
 
     /** Get the block ID of a block at the provided position. */
-    private static int blockIdAt(Object level, int x, int y, int z) throws Exception {
+    public static int blockIdAt(Object level, int x, int y, int z) throws Exception {
         return (Integer) accessFor(level).getBlockId.invoke(level, x, y, z);
     }
 
-    private static void setTile(Object level, int x, int y, int z, int blockId) throws Exception {
+    public static void setTile(Object level, int x, int y, int z, int blockId) throws Exception {
         accessFor(level).setTile.invoke(level, x, y, z, blockId);
     }
 
