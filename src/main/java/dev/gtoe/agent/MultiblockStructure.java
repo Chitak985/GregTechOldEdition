@@ -40,6 +40,9 @@ public class MultiblockStructure {
     public int controllerBlockId;
     public List<List<String>> structure;
     public HashMap<String, Integer> blockMappings;
+    public int controllerStructureSlice;
+    public int controllerStructureRow;
+    public int controllerStructureRowIndex;
 
     public MultiblockStructure(int controllerBlockId,
                                List<List<String>> structure,
@@ -47,8 +50,72 @@ public class MultiblockStructure {
         this.controllerBlockId = controllerBlockId;
         this.structure = structure;
         this.blockMappings = blockMappings;
+
+        // Reverse the slices so they start from the controller and go backwards
+        Collections.reverse(structure);
+
+        // Find the controller position inside the structure
+        boolean controllerFound = false;
+        for (List<string> slice : structure) {
+            for (List<string> row : slice) {
+                for (char block : row.toCharArray()) {
+                    if (block == '!') {
+                        controllerFound = true;
+                        break;
+                    }
+                    controllerStructureRowIndex += 1;
+                }
+                if (controllerFound) break;
+                controllerStructureRow += 1;
+            }
+            if (controllerFound) break;
+            controllerStructureSlice += 1;
+        }
+        if (!controllerFound)
+            System.err.println("[gtoe] Controller not found in multiblock structure!");
     }
 
+    /** Check if the multiblock can form. **/
+    public boolean CheckStructure(Object level,
+                                  int x, int y, int z) {  // Controller position
+        if (level == null) {
+            throw new IllegalArgumentException("Level access is required to check the structure!");
+        }
+
+        for (List<string> slice : structure) {
+            for (List<string> row : slice) {
+                for (char block : row.toCharArray()) {
+                    int blockID;
+                    if (block == '!') {
+                        blockID = controllerBlockId;
+                    } else if (block == ' ') {
+                        blockID = 0;
+                    } else if (block == '?') {
+                        blockID = -1;  // Not equal 0
+                    } else if (block == '-') {
+                        continue;
+                    } else {
+                        blockID = blockMappings.get(block);
+                        if (blockID == null) {
+                            System.err.println("[gtoe] Block "+block+" not found in block mappings for multiblock structure, skipping block.");
+                            continue;
+                        }
+                    }
+
+                    // APPLY OFFSET!!!!!
+                    if (blockID == -1 && WorldActions.blockIdAt(level, x, y, z) == 0) {
+                        return false;
+                    } else if (WorldActions.blockIdAt(level, x, y, z) != blockID) {
+                        return false;
+                    }
+                }
+            }
+        }
+        
+        return true;
+    }
+
+    /** Create the block mapping HashMap for a multiblock structure. **/
     public static HashMap<String, Integer> CreateBlockMapping(List<String> symbols, List<Integer> blocks) {
         if(symbols.size() != blocks.size()) {
             System.err.println("[gtoe] Array length mismatch while creating multiblock block mapping!" +
