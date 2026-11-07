@@ -56,6 +56,8 @@ public final class InstalledGameVerification {
         final boolean[] placeActionFound = {false};
         final boolean[] mouseGuiInputFound = {false};
         final boolean[] hudFound = {false};
+        final int[] blockTickHooks = {0};
+        final boolean[] sixtyHzTimer = {false};
         final int[] filteredMouseDeltas = {0};
         final int[] originalSetTileCalls = {0};
         new ClassReader(bytecode).accept(new ClassVisitor(Opcodes.ASM9) {
@@ -68,12 +70,21 @@ public final class InstalledGameVerification {
                         if (GtoeTransformer.INIT_MESSAGE.equals(value)) {
                             messageFound[0] = true;
                         }
+                        if ("<init>".equals(name) && Float.valueOf(60.0f).equals(value)) {
+                            sixtyHzTimer[0] = true;
+                        }
                     }
 
                     @Override
                     public void visitMethodInsn(
                             int opcode, String owner, String methodName, String methodDescriptor,
                             boolean isInterface) {
+                        if ("tick".equals(name) && "()V".equals(descriptor)
+                                && "dev/gtoe/agent/BlockTicker".equals(owner)
+                                && "onGameTick".equals(methodName)
+                                && "(Ljava/lang/Object;)V".equals(methodDescriptor)) {
+                            blockTickHooks[0]++;
+                        }
                         if (opcode == Opcodes.INVOKESTATIC
                                 && "dev/gtoe/agent/BlockSelection".equals(owner)
                                 && "handleKeyEvent".equals(methodName)
@@ -133,6 +144,8 @@ public final class InstalledGameVerification {
         require(filteredMouseDeltas[0] == 2, "RubyDung camera motion is not paused for GUIs");
         require(originalSetTileCalls[0] == 0, "RubyDung still changes blocks outside inventory actions");
         require(hudFound[0], "RubyDung does not render the top-left block overlay");
+        require(sixtyHzTimer[0] && blockTickHooks[0] == 1,
+                "Block ticking requires the original 60 Hz timer and one simulation-tick hook");
     }
 
     private static void verifyPlayer(byte[] bytecode) {
@@ -171,8 +184,22 @@ public final class InstalledGameVerification {
         final boolean[] getterFound = {false};
         final boolean[] applyFound = {false};
         final boolean[] nonzeroCheckFound = {false};
+        final boolean[] tickerFieldFound = {false};
+        final boolean[] tickerInitialized = {false};
+        final boolean[] blockChangeFound = {false};
+        final boolean[] reloadFound = {false};
 
         new ClassReader(bytecode).accept(new ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public FieldVisitor visitField(
+                    int access, String name, String descriptor, String signature, Object value) {
+                if (GtoeTransformer.BLOCK_TICKER_FIELD.equals(name)
+                        && "Ldev/gtoe/agent/BlockTicker;".equals(descriptor)) {
+                    tickerFieldFound[0] = true;
+                }
+                return null;
+            }
+
             @Override
             public MethodVisitor visitMethod(
                     int access, String name, String descriptor, String signature, String[] exceptions) {
@@ -190,6 +217,11 @@ public final class InstalledGameVerification {
                                     && "apply".equals(name)) {
                                 applyFound[0] = true;
                             }
+                            if ("dev/gtoe/agent/BlockTicker".equals(owner)
+                                    && "initialize".equals(name)) {
+                                require(applyFound[0], "Tick state must initialize after terrain conversion");
+                                tickerInitialized[0] = true;
+                            }
                         }
                     };
                 }
@@ -205,6 +237,23 @@ public final class InstalledGameVerification {
                     };
                 }
 
+                if ("setTile".equals(name) || "load".equals(name)) {
+                    return new MethodVisitor(Opcodes.ASM9) {
+                        @Override
+                        public void visitMethodInsn(int opcode, String owner, String method,
+                                String methodDescriptor, boolean isInterface) {
+                            if ("dev/gtoe/agent/BlockTicker".equals(owner)) {
+                                if ("setTile".equals(name) && "onBlockChanged".equals(method)) {
+                                    blockChangeFound[0] = true;
+                                }
+                                if ("load".equals(name) && "onLevelLoaded".equals(method)) {
+                                    reloadFound[0] = true;
+                                }
+                            }
+                        }
+                    };
+                }
+
                 return null;
             }
         }, 0);
@@ -212,6 +261,8 @@ public final class InstalledGameVerification {
         require(getterFound[0], "Level block-ID getter was not added");
         require(applyFound[0], "Level constructor does not apply Y layers");
         require(nonzeroCheckFound[0], "Level.isTile does not accept every nonzero block ID");
+        require(tickerFieldFound[0] && tickerInitialized[0] && blockChangeFound[0] && reloadFound[0],
+                "Level must track block instances during construction, changes and reloads");
     }
 
     private static void verifyTile(byte[] bytecode) {

@@ -8,6 +8,7 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.FieldVisitor;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
@@ -21,6 +22,7 @@ final class GtoeTransformer implements ClassFileTransformer {
     static final String INIT_MESSAGE = "[gtoe] RubyDung.init() entered";
     static final String TILE_ARRAY_FIELD = "gtoe$tiles";
     static final String BLOCK_ID_METHOD = "gtoe$getBlockId";
+    static final String BLOCK_TICKER_FIELD = "gtoe$blockTicker";
     static final String AGENT_TERRAIN_RESOURCE = "/gtoe-terrain.png";
 
     private static final String TERRAIN_LAYERS = "dev/gtoe/agent/TerrainLayers";
@@ -28,6 +30,7 @@ final class GtoeTransformer implements ClassFileTransformer {
     private static final String HUD_OVERLAY = "dev/gtoe/agent/HudOverlay";
     private static final String GUI_MANAGER = "dev/gtoe/agent/GuiManager";
     private static final String WORLD_ACTIONS = "dev/gtoe/agent/WorldActions";
+    private static final String BLOCK_TICKER = "dev/gtoe/agent/BlockTicker";
 
     @Override
     public byte[] transform(
@@ -70,6 +73,7 @@ final class GtoeTransformer implements ClassFileTransformer {
         final boolean[] placementPatched = {false};
         final boolean[] hudPatched = {false};
         final boolean[] mouseEventPatched = {false};
+        final boolean[] tickPatched = {false};
         final int[] setTileCalls = {0};
         final int[] mouseButtonCalls = {0};
         final int[] mouseDeltaCalls = {0};
@@ -84,6 +88,21 @@ final class GtoeTransformer implements ClassFileTransformer {
                     String[] exceptions) {
                 MethodVisitor delegate = super.visitMethod(
                         access, name, descriptor, signature, exceptions);
+                if ("tick".equals(name) && "()V".equals(descriptor)) {
+                    tickPatched[0] = true;
+                    return new MethodVisitor(Opcodes.ASM9, delegate) {
+                        @Override
+                        public void visitInsn(int opcode) {
+                            if (opcode == Opcodes.RETURN) {
+                                super.visitVarInsn(Opcodes.ALOAD, 0);
+                                super.visitFieldInsn(Opcodes.GETFIELD, RUBY_DUNG, "level", "L" + LEVEL + ";");
+                                super.visitMethodInsn(Opcodes.INVOKESTATIC, BLOCK_TICKER,
+                                        "onGameTick", "(Ljava/lang/Object;)V", false);
+                            }
+                            super.visitInsn(opcode);
+                        }
+                    };
+                }
                 if (!"init".equals(name) || !"()V".equals(descriptor)) {
                     if (!"render".equals(name) || !"(F)V".equals(descriptor)) {
                         return delegate;
@@ -277,6 +296,7 @@ final class GtoeTransformer implements ClassFileTransformer {
         require(mouseDeltaCalls[0] == 2,
                 "RubyDung.render(F)V mouse camera deltas were not recognized");
         require(hudPatched[0], "RubyDung.render(F)V display update was not recognized");
+        require(tickPatched[0], "RubyDung.tick()V was not found for block ticking");
         System.out.println("[gtoe] Added inventory-aware actions, GUI input, block selection, and HUD to RubyDung");
         return writer.toByteArray();
     }
@@ -338,6 +358,8 @@ final class GtoeTransformer implements ClassFileTransformer {
         ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_MAXS);
         final boolean[] constructorPatched = {false};
         final boolean[] isTilePatched = {false};
+        final boolean[] setTilePatched = {false};
+        final boolean[] loadPatched = {false};
 
         reader.accept(new ClassVisitor(Opcodes.ASM9, writer) {
             @Override
@@ -362,7 +384,41 @@ final class GtoeTransformer implements ClassFileTransformer {
                                         "apply",
                                         "(Ljava/lang/Object;)V",
                                         false);
+                                super.visitVarInsn(Opcodes.ALOAD, 0);
+                                super.visitVarInsn(Opcodes.ALOAD, 0);
+                                super.visitMethodInsn(Opcodes.INVOKESTATIC, BLOCK_TICKER,
+                                        "initialize", "(Ljava/lang/Object;)L" + BLOCK_TICKER + ";", false);
+                                super.visitFieldInsn(Opcodes.PUTFIELD, LEVEL,
+                                        BLOCK_TICKER_FIELD, "L" + BLOCK_TICKER + ";");
                                 constructorPatched[0] = true;
+                            }
+                            super.visitInsn(opcode);
+                        }
+                    };
+                }
+
+                if (("setTile".equals(name) && "(IIII)V".equals(descriptor))
+                        || ("load".equals(name) && "()V".equals(descriptor))) {
+                    final boolean changingTile = "setTile".equals(name);
+                    if (changingTile) {
+                        setTilePatched[0] = true;
+                    } else {
+                        loadPatched[0] = true;
+                    }
+                    return new MethodVisitor(Opcodes.ASM9, delegate) {
+                        @Override
+                        public void visitInsn(int opcode) {
+                            if (opcode == Opcodes.RETURN) {
+                                super.visitVarInsn(Opcodes.ALOAD, 0);
+                                if (changingTile) {
+                                    super.visitVarInsn(Opcodes.ILOAD, 1);
+                                    super.visitVarInsn(Opcodes.ILOAD, 2);
+                                    super.visitVarInsn(Opcodes.ILOAD, 3);
+                                }
+                                super.visitMethodInsn(Opcodes.INVOKESTATIC, BLOCK_TICKER,
+                                        changingTile ? "onBlockChanged" : "onLevelLoaded",
+                                        changingTile ? "(Ljava/lang/Object;III)V" : "(Ljava/lang/Object;)V",
+                                        false);
                             }
                             super.visitInsn(opcode);
                         }
@@ -406,6 +462,8 @@ final class GtoeTransformer implements ClassFileTransformer {
 
             @Override
             public void visitEnd() {
+                super.visitField(Opcodes.ACC_PUBLIC, BLOCK_TICKER_FIELD,
+                        "L" + BLOCK_TICKER + ";", null, null).visitEnd();
                 MethodVisitor getter = super.visitMethod(
                         Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL,
                         BLOCK_ID_METHOD,
@@ -413,6 +471,20 @@ final class GtoeTransformer implements ClassFileTransformer {
                         null,
                         null);
                 getter.visitCode();
+                Label outside = new Label();
+                getter.visitVarInsn(Opcodes.ILOAD, 1);
+                getter.visitJumpInsn(Opcodes.IFLT, outside);
+                getter.visitVarInsn(Opcodes.ILOAD, 2);
+                getter.visitJumpInsn(Opcodes.IFLT, outside);
+                getter.visitVarInsn(Opcodes.ILOAD, 3);
+                getter.visitJumpInsn(Opcodes.IFLT, outside);
+                String[] dimensions = {"width", "depth", "height"};
+                for (int coordinate = 1; coordinate <= 3; coordinate++) {
+                    getter.visitVarInsn(Opcodes.ILOAD, coordinate);
+                    getter.visitVarInsn(Opcodes.ALOAD, 0);
+                    getter.visitFieldInsn(Opcodes.GETFIELD, LEVEL, dimensions[coordinate - 1], "I");
+                    getter.visitJumpInsn(Opcodes.IF_ICMPGE, outside);
+                }
                 getter.visitVarInsn(Opcodes.ALOAD, 0);
                 getter.visitFieldInsn(Opcodes.GETFIELD, LEVEL, "blocks", "[B");
                 getter.visitVarInsn(Opcodes.ILOAD, 2);
@@ -430,6 +502,9 @@ final class GtoeTransformer implements ClassFileTransformer {
                 getter.visitIntInsn(Opcodes.SIPUSH, 255);
                 getter.visitInsn(Opcodes.IAND);
                 getter.visitInsn(Opcodes.IRETURN);
+                getter.visitLabel(outside);
+                getter.visitInsn(Opcodes.ICONST_M1);
+                getter.visitInsn(Opcodes.IRETURN);
                 getter.visitMaxs(0, 0);
                 getter.visitEnd();
                 super.visitEnd();
@@ -438,6 +513,7 @@ final class GtoeTransformer implements ClassFileTransformer {
 
         require(constructorPatched[0], "Level(int,int,int) constructor was not patched");
         require(isTilePatched[0], "Level.isTile(III)Z block comparison was not recognized");
+        require(setTilePatched[0] && loadPatched[0], "Level block lifecycle hooks were not recognized");
         System.out.println("[gtoe] Enabled fixed initial Y layers and nonzero block-ID solidity in Level");
         return writer.toByteArray();
     }

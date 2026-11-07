@@ -46,6 +46,7 @@ public final class TransformerVerification {
         require(TerrainLayers.blockIdForY(20) == 3, "Y=20 should use block ID 3");
         require(TerrainLayers.blockIdForY(40) == 1, "Y=40 should use block ID 1");
         verifyTreeGeneration();
+        BlockTickVerification.run();
 
         Inventory.clearForTests();
         GuiManager.resetForTests();
@@ -314,6 +315,14 @@ public final class TransformerVerification {
                 null);
         writer.visitField(Opcodes.ACC_PRIVATE, "width", "I", null, null).visitEnd();
         writer.visitField(Opcodes.ACC_PRIVATE, "height", "I", null, null).visitEnd();
+        writer.visitField(Opcodes.ACC_PRIVATE, "level", "L" + GtoeTransformer.LEVEL + ";",
+                null, null).visitEnd();
+
+        MethodVisitor tick = writer.visitMethod(Opcodes.ACC_PUBLIC, "tick", "()V", null, null);
+        tick.visitCode();
+        tick.visitInsn(Opcodes.RETURN);
+        tick.visitMaxs(0, 1);
+        tick.visitEnd();
 
         MethodVisitor method = writer.visitMethod(
                 Opcodes.ACC_PUBLIC,
