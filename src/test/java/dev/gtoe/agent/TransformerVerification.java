@@ -47,6 +47,7 @@ public final class TransformerVerification {
         require(TerrainLayers.blockIdForY(40) == 1, "Y=40 should use block ID 1");
         verifyTreeGeneration();
         BlockTickVerification.run();
+        BlockPickingVerification.run();
 
         Inventory.clearForTests();
         GuiManager.resetForTests();
@@ -323,6 +324,12 @@ public final class TransformerVerification {
         tick.visitInsn(Opcodes.RETURN);
         tick.visitMaxs(0, 1);
         tick.visitEnd();
+
+        MethodVisitor pick = writer.visitMethod(Opcodes.ACC_PRIVATE, "pick", "(F)V", null, null);
+        pick.visitCode();
+        pick.visitInsn(Opcodes.RETURN);
+        pick.visitMaxs(0, 2);
+        pick.visitEnd();
 
         MethodVisitor method = writer.visitMethod(
                 Opcodes.ACC_PUBLIC,

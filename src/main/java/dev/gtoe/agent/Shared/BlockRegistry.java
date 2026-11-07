@@ -1,13 +1,10 @@
 package dev.gtoe.agent;
 
-import java.util.Arrays;
-
-/** Assign block classes here before a world loads. Each position gets a new instance. */
+/** Opt block IDs into ticking here before a world loads. Ordinary terrain has no instances. */
 public final class BlockRegistry {
     private static final Factory[] FACTORIES = new Factory[ItemCatalog.FIRST_ITEM_ID];
 
     static {
-        Arrays.fill(FACTORIES, (Factory) AdvancedBlock::new);
         register(22, MachineMultiblock::new);
     }
 
@@ -21,8 +18,19 @@ public final class BlockRegistry {
         FACTORIES[blockId] = factory;
     }
 
-    static AdvancedBlock create(Object level, int x, int y, int z, int blockId) {
+    public static void unregister(int blockId) {
         if (blockId <= 0 || !ItemCatalog.isBlock(blockId)) {
+            throw new IllegalArgumentException("Expected a solid block ID");
+        }
+        FACTORIES[blockId] = null;
+    }
+
+    public static boolean isTicking(int blockId) {
+        return blockId > 0 && blockId < FACTORIES.length && FACTORIES[blockId] != null;
+    }
+
+    static AdvancedBlock create(Object level, int x, int y, int z, int blockId) {
+        if (!isTicking(blockId)) {
             return null;
         }
         AdvancedBlock block = FACTORIES[blockId].create(level, x, y, z, blockId);

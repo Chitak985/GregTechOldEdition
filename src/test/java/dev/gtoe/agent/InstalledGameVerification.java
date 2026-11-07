@@ -58,6 +58,7 @@ public final class InstalledGameVerification {
         final boolean[] hudFound = {false};
         final int[] blockTickHooks = {0};
         final boolean[] sixtyHzTimer = {false};
+        final boolean[] cpuPickingFound = {false};
         final int[] filteredMouseDeltas = {0};
         final int[] originalSetTileCalls = {0};
         new ClassReader(bytecode).accept(new ClassVisitor(Opcodes.ASM9) {
@@ -79,6 +80,15 @@ public final class InstalledGameVerification {
                     public void visitMethodInsn(
                             int opcode, String owner, String methodName, String methodDescriptor,
                             boolean isInterface) {
+                        if ("pick".equals(name) && "(F)V".equals(descriptor)) {
+                            require(!owner.startsWith("org/lwjgl/")
+                                            && !"com/mojang/rubydung/level/LevelRenderer".equals(owner),
+                                    "Block picking still performs an OpenGL selection/draw pass");
+                            if ("dev/gtoe/agent/BlockPicker".equals(owner)
+                                    && "pick".equals(methodName)) {
+                                cpuPickingFound[0] = true;
+                            }
+                        }
                         if ("tick".equals(name) && "()V".equals(descriptor)
                                 && "dev/gtoe/agent/BlockTicker".equals(owner)
                                 && "onGameTick".equals(methodName)
@@ -146,6 +156,7 @@ public final class InstalledGameVerification {
         require(hudFound[0], "RubyDung does not render the top-left block overlay");
         require(sixtyHzTimer[0] && blockTickHooks[0] == 1,
                 "Block ticking requires the original 60 Hz timer and one simulation-tick hook");
+        require(cpuPickingFound[0], "RubyDung.pick must use CPU ray picking");
     }
 
     private static void verifyPlayer(byte[] bytecode) {

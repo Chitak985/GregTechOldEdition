@@ -1,6 +1,8 @@
 package dev.gtoe.agent;
 
 import java.lang.reflect.Field;
+import java.util.HashMap;
+import java.util.Map;
 
 /** World-owned block instances and ticking, driven by RubyDung's 60 Hz simulation. */
 public final class BlockTicker {
@@ -9,7 +11,19 @@ public final class BlockTicker {
     private static final String STATE_FIELD = "gtoe$blockTicker";
     private final Object level;
     private final byte[] blockIds;
-    private final AdvancedBlock[] blocks;
+    private final Map<Integer, AdvancedBlock> blocks = new HashMap<>();
+    private AdvancedBlock[] tickSnapshot = new AdvancedBlock[0];
+    private boolean snapshotDirty;
+    private static final ClassValue<Field> STATE_FIELDS = new ClassValue<Field>() {
+        @Override
+        protected Field computeValue(Class<?> type) {
+            try {
+                return type.getField(STATE_FIELD);
+            } catch (NoSuchFieldException error) {
+                throw new IllegalStateException("Level is missing the block ticking hook", error);
+            }
+        }
+    };
     private final int width;
     private final int height;
     private final int depth;
@@ -30,12 +44,13 @@ public final class BlockTicker {
                 || (long) width * height * depth != blockIds.length) {
             throw new IllegalArgumentException("Unexpected world dimensions or block array");
         }
-        blocks = new AdvancedBlock[blockIds.length];
-        for (int y = 0; y < depth; y++) {
-            for (int z = 0; z < height; z++) {
-                for (int x = 0; x < width; x++) {
-                    updateBlock(x, y, z);
-                }
+        // Only loading scans terrain. The steady-state tick loop visits registered machines only.
+        for (int index = 0; index < blockIds.length; index++) {
+            if (BlockRegistry.isTicking(blockIds[index] & 255)) {
+                int x = index % width;
+                int z = (index / width) % height;
+                int y = index / (width * height);
+                updateBlock(x, y, z);
             }
         }
     }
@@ -70,7 +85,7 @@ public final class BlockTicker {
     public static void onLevelLoaded(Object level) {
         if (forLevel(level) != null) {
             try {
-                level.getClass().getField(STATE_FIELD).set(level, initialize(level));
+                STATE_FIELDS.get(level.getClass()).set(level, initialize(level));
             } catch (ReflectiveOperationException error) {
                 throw new IllegalStateException("Cannot reload block state", error);
             }
@@ -82,15 +97,19 @@ public final class BlockTicker {
             return null;
         }
         try {
-            return (BlockTicker) level.getClass().getField(STATE_FIELD).get(level);
+            return (BlockTicker) STATE_FIELDS.get(level.getClass()).get(level);
         } catch (ReflectiveOperationException error) {
             throw new IllegalStateException("Level is missing the block ticking hook", error);
         }
     }
 
-    /** Returns the persistent instance at a position; air/outside the world returns null. */
+    /** Returns a registered ticking instance; ordinary terrain, air and outside return null. */
     public AdvancedBlock blockAt(int x, int y, int z) {
-        return inBounds(x, y, z) ? blocks[index(x, y, z)] : null;
+        return inBounds(x, y, z) ? blocks.get(index(x, y, z)) : null;
+    }
+
+    public int activeBlockCount() {
+        return blocks.size();
     }
 
     public long tickCount() {
@@ -100,19 +119,28 @@ public final class BlockTicker {
     private void updateBlock(int x, int y, int z) {
         int index = index(x, y, z);
         int id = blockIds[index] & 255;
-        AdvancedBlock existing = blocks[index];
-        if (existing == null || existing.blockId != id) {
-            blocks[index] = BlockRegistry.create(level, x, y, z, id);
+        AdvancedBlock existing = blocks.get(index);
+        if (!BlockRegistry.isTicking(id)) {
+            if (existing != null) {
+                blocks.remove(index);
+                snapshotDirty = true;
+            }
+        } else if (existing == null || existing.blockId != id) {
+            blocks.put(index, BlockRegistry.create(level, x, y, z, id));
+            snapshotDirty = true;
         }
     }
 
     private void tickBlocks() {
         ticks++;
-        // Traverse persistent instances without reflection or reading the world's block IDs.
-        // Changes made by Tick are visible to subsequent blocks in this traversal.
-        for (int index = 0; index < blocks.length; index++) {
-            AdvancedBlock block = blocks[index];
-            if (block == null) {
+        if (snapshotDirty) {
+            tickSnapshot = blocks.values().toArray(new AdvancedBlock[blocks.size()]);
+            snapshotDirty = false;
+        }
+        // The snapshot is rebuilt only on changes. New machines start next tick;
+        // machines removed/replaced by another machine's Tick are skipped immediately.
+        for (AdvancedBlock block : tickSnapshot) {
+            if (blocks.get(index(block.x, block.y, block.z)) != block) {
                 continue;
             }
             try {

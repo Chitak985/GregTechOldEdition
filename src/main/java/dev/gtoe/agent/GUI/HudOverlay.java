@@ -3,6 +3,9 @@ package dev.gtoe.agent;
 /** Selected-slot HUD plus the entry point for agent-owned GUI rendering. */
 public final class HudOverlay {
     private static volatile boolean disabled;
+    private static long fpsWindowStart;
+    private static int framesInWindow;
+    private static String fpsLabel = "FPS 0";
 
     private HudOverlay() {
     }
@@ -11,6 +14,7 @@ public final class HudOverlay {
         if (disabled || screenWidth <= 0 || screenHeight <= 0) {
             return;
         }
+        recordFrame(System.nanoTime());
 
         boolean drawingStarted = false;
         try {
@@ -28,6 +32,8 @@ public final class HudOverlay {
             GuiGraphics.drawTextNormal(label, 4, 4);
             GuiManager.render(screenWidth, screenHeight);
             GuiManager.renderHotbar(screenWidth, screenHeight);
+            GuiGraphics.drawTextNormal(fpsLabel,
+                    Math.max(4, screenWidth - GuiGraphics.textWidth(fpsLabel, 2) - 4), 4);
         } catch (Throwable error) {
             disabled = true;
             System.err.println("[gtoe] Disabling HUD and GUI rendering after an error");
@@ -40,6 +46,20 @@ public final class HudOverlay {
                     disabled = true;
                 }
             }
+        }
+    }
+
+    private static void recordFrame(long now) {
+        if (fpsWindowStart == 0) {
+            fpsWindowStart = now;
+            return;
+        }
+        framesInWindow++;
+        long elapsed = now - fpsWindowStart;
+        if (elapsed >= 1_000_000_000L) {
+            fpsLabel = "FPS " + Math.round(framesInWindow * 1_000_000_000.0 / elapsed);
+            framesInWindow = 0;
+            fpsWindowStart = now;
         }
     }
 }

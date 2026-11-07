@@ -31,6 +31,9 @@ final class GtoeTransformer implements ClassFileTransformer {
     private static final String GUI_MANAGER = "dev/gtoe/agent/GuiManager";
     private static final String WORLD_ACTIONS = "dev/gtoe/agent/WorldActions";
     private static final String BLOCK_TICKER = "dev/gtoe/agent/BlockTicker";
+    private static final String BLOCK_PICKER = "dev/gtoe/agent/BlockPicker";
+    private static final String PICK_HIT = BLOCK_PICKER + "$Hit";
+    private static final String HIT_RESULT = "com/mojang/rubydung/HitResult";
 
     @Override
     public byte[] transform(
@@ -74,6 +77,7 @@ final class GtoeTransformer implements ClassFileTransformer {
         final boolean[] hudPatched = {false};
         final boolean[] mouseEventPatched = {false};
         final boolean[] tickPatched = {false};
+        final boolean[] pickingPatched = {false};
         final int[] setTileCalls = {0};
         final int[] mouseButtonCalls = {0};
         final int[] mouseDeltaCalls = {0};
@@ -88,6 +92,11 @@ final class GtoeTransformer implements ClassFileTransformer {
                     String[] exceptions) {
                 MethodVisitor delegate = super.visitMethod(
                         access, name, descriptor, signature, exceptions);
+                if ("pick".equals(name) && "(F)V".equals(descriptor)) {
+                    writeCpuPick(delegate);
+                    pickingPatched[0] = true;
+                    return null;
+                }
                 if ("tick".equals(name) && "()V".equals(descriptor)) {
                     tickPatched[0] = true;
                     return new MethodVisitor(Opcodes.ASM9, delegate) {
@@ -297,8 +306,45 @@ final class GtoeTransformer implements ClassFileTransformer {
                 "RubyDung.render(F)V mouse camera deltas were not recognized");
         require(hudPatched[0], "RubyDung.render(F)V display update was not recognized");
         require(tickPatched[0], "RubyDung.tick()V was not found for block ticking");
+        require(pickingPatched[0], "RubyDung.pick(F)V was not found for CPU block picking");
         System.out.println("[gtoe] Added inventory-aware actions, GUI input, block selection, and HUD to RubyDung");
         return writer.toByteArray();
+    }
+
+    /** Replaces the legacy GL_SELECT pass while retaining the game's HitResult consumer. */
+    private static void writeCpuPick(MethodVisitor method) {
+        method.visitCode();
+        method.visitVarInsn(Opcodes.ALOAD, 0);
+        method.visitFieldInsn(Opcodes.GETFIELD, RUBY_DUNG, "level", "L" + LEVEL + ";");
+        method.visitVarInsn(Opcodes.ALOAD, 0);
+        method.visitFieldInsn(Opcodes.GETFIELD, RUBY_DUNG, "player", "L" + PLAYER + ";");
+        method.visitVarInsn(Opcodes.FLOAD, 1);
+        method.visitMethodInsn(Opcodes.INVOKESTATIC, BLOCK_PICKER, "pick",
+                "(Ljava/lang/Object;Ljava/lang/Object;F)L" + PICK_HIT + ";", false);
+        method.visitVarInsn(Opcodes.ASTORE, 2);
+        method.visitVarInsn(Opcodes.ALOAD, 2);
+        Label miss = new Label();
+        method.visitJumpInsn(Opcodes.IFNULL, miss);
+        method.visitVarInsn(Opcodes.ALOAD, 0);
+        method.visitTypeInsn(Opcodes.NEW, HIT_RESULT);
+        method.visitInsn(Opcodes.DUP);
+        for (String coordinate : new String[] {"x", "y", "z"}) {
+            method.visitVarInsn(Opcodes.ALOAD, 2);
+            method.visitFieldInsn(Opcodes.GETFIELD, PICK_HIT, coordinate, "I");
+        }
+        method.visitInsn(Opcodes.ICONST_0); // Object kind, as in the original block hit results.
+        method.visitVarInsn(Opcodes.ALOAD, 2);
+        method.visitFieldInsn(Opcodes.GETFIELD, PICK_HIT, "face", "I");
+        method.visitMethodInsn(Opcodes.INVOKESPECIAL, HIT_RESULT, "<init>", "(IIIII)V", false);
+        method.visitFieldInsn(Opcodes.PUTFIELD, RUBY_DUNG, "hitResult", "L" + HIT_RESULT + ";");
+        method.visitInsn(Opcodes.RETURN);
+        method.visitLabel(miss);
+        method.visitVarInsn(Opcodes.ALOAD, 0);
+        method.visitInsn(Opcodes.ACONST_NULL);
+        method.visitFieldInsn(Opcodes.PUTFIELD, RUBY_DUNG, "hitResult", "L" + HIT_RESULT + ";");
+        method.visitInsn(Opcodes.RETURN);
+        method.visitMaxs(0, 0);
+        method.visitEnd();
     }
 
     private static byte[] transformPlayer(byte[] classfileBuffer) {

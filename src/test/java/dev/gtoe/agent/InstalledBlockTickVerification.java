@@ -1,6 +1,7 @@
 package dev.gtoe.agent;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -50,11 +51,48 @@ public final class InstalledBlockTickVerification {
             require(BlockTicker.forLevel(world) != ticker
                     && BlockTicker.forLevel(world).blockAt(5, 5, 5) instanceof MachineMultiblock,
                     "Real Level.load must rebuild saved controller state");
+            verifyCpuPicking(world, type);
             System.out.println("Installed block ticking passed: constructor, setTile, 20 Hz, bounds and reload");
         } finally {
-            BlockRegistry.register(98, AdvancedBlock::new);
+            BlockRegistry.unregister(98);
             Files.delete(save);
         }
+    }
+
+    /** Uses the real patched private method, with no display or OpenGL context. */
+    private static void verifyCpuPicking(Object world, Class<?> levelType) throws Exception {
+        Class<?> gameType = Class.forName("com.mojang.rubydung.RubyDung");
+        Class<?> playerType = Class.forName("com.mojang.rubydung.Player");
+        Object game = gameType.getConstructor().newInstance();
+        Object player = playerType.getConstructor(levelType).newInstance(world);
+        Field levelField = gameType.getDeclaredField("level");
+        Field playerField = gameType.getDeclaredField("player");
+        Field hitField = gameType.getDeclaredField("hitResult");
+        levelField.setAccessible(true);
+        playerField.setAccessible(true);
+        hitField.setAccessible(true);
+        levelField.set(game, world);
+        playerField.set(game, player);
+        Method position = playerType.getDeclaredMethod("setPos", float.class, float.class, float.class);
+        position.setAccessible(true);
+        position.invoke(player, 2.5f, 5.5f, 6.5f);
+        for (String coordinate : new String[] {"x", "y", "z"}) {
+            playerType.getField(coordinate + "o").setFloat(player,
+                    playerType.getField(coordinate).getFloat(player));
+        }
+        WorldActions.setTile(world, 2, 5, 4, 21);
+        Method pick = gameType.getDeclaredMethod("pick", float.class);
+        pick.setAccessible(true);
+        pick.invoke(game, 1.0f);
+        Object hit = hitField.get(game);
+        require(hit != null && hit.getClass().getField("x").getInt(hit) == 2
+                && hit.getClass().getField("z").getInt(hit) == 4
+                && hit.getClass().getField("f").getInt(hit) == 3,
+                "The real picker must return coordinates and the placement face without a GL context");
+        WorldActions.setTile(world, 2, 5, 4, 0);
+        pick.invoke(game, 1.0f);
+        require(hitField.get(game) == null, "Looking into air must clear the real game's stale highlight");
+        System.out.println("Installed CPU picking passed: actual RubyDung.pick, correct face and cleared miss, no OpenGL context");
     }
 
     private static void require(boolean condition, String message) {

@@ -16,6 +16,15 @@ public final class BlockTickVerification {
     }
 
     private static void verifyTicking() {
+        TestLevel terrainOnly = new TestLevel();
+        Arrays.fill(terrainOnly.blocks, (byte) 3);
+        terrainOnly.gtoe$blockTicker = BlockTicker.initialize(terrainOnly);
+        require(terrainOnly.gtoe$blockTicker.activeBlockCount() == 0,
+                "Terrain-only worlds must not allocate ticking block instances");
+        for (int id = 1; id < ItemCatalog.FIRST_ITEM_ID; id++) {
+            require(BlockRegistry.isTicking(id) == (id == 22),
+                    "Only the furnace main hatch should tick by default: " + id);
+        }
         BlockRegistry.register(98, CountingBlock::new);
         try {
             TestLevel world = new TestLevel();
@@ -45,8 +54,9 @@ public final class BlockTickVerification {
             require(replacement != first && replacement.calls == 1,
                     "Replaced blocks must start with a fresh instance");
             world.setTile(3, 4, 5, 3);
-            require(world.gtoe$blockTicker.blockAt(3, 4, 5).getClass() == AdvancedBlock.class,
-                    "Ordinary blocks should fall back to AdvancedBlock");
+            require(world.gtoe$blockTicker.blockAt(3, 4, 5) == null
+                    && world.gtoe$blockTicker.activeBlockCount() == 1,
+                    "Ordinary blocks must not allocate or tick AdvancedBlock instances");
             BlockTicker previous = world.gtoe$blockTicker;
             BlockTicker.onLevelLoaded(world);
             require(world.gtoe$blockTicker != previous && world.gtoe$blockTicker.tickCount() == 0,
@@ -59,7 +69,7 @@ public final class BlockTickVerification {
             require(world.gtoe$blockTicker.blockAt(-1, 4, 5) == null,
                     "Out-of-world block instances must be absent");
         } finally {
-            BlockRegistry.register(98, AdvancedBlock::new);
+            BlockRegistry.unregister(98);
         }
     }
 
