@@ -16,6 +16,9 @@ public final class InstalledBlockTickVerification {
     public static void main(String[] arguments) throws Exception {
         // CREATE_NEW guarantees this test cannot overwrite an existing game save.
         Path save = Paths.get("level.dat");
+        if (Files.exists(Paths.get(FurnacePersistence.FILE_NAME))) {
+            throw new IllegalStateException("Integration test requires a folder without furnace saves");
+        }
         try (GZIPOutputStream output = new GZIPOutputStream(Files.newOutputStream(
                 save, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE))) {
             byte[] blocks = new byte[12 * 12 * 12];
@@ -52,9 +55,19 @@ public final class InstalledBlockTickVerification {
                     && BlockTicker.forLevel(world).blockAt(5, 5, 5) instanceof MachineMultiblock,
                     "Real Level.load must rebuild saved controller state");
             verifyCpuPicking(world, type);
+            MachineMultiblock machine = (MachineMultiblock) BlockTicker.forLevel(world).blockAt(5, 5, 5);
+            machine.input.add(3, 5);
+            type.getMethod("save").invoke(world);
+            require(Files.isRegularFile(Paths.get(FurnacePersistence.FILE_NAME)),
+                    "The real Level.save hook must write the furnace sidecar");
+            type.getMethod("load").invoke(world);
+            machine = (MachineMultiblock) BlockTicker.forLevel(world).blockAt(5, 5, 5);
+            require(machine.input.itemID() == 3 && machine.input.count() == 5,
+                    "The real save/load hooks must preserve hatch inventory");
             System.out.println("Installed block ticking passed: constructor, setTile, 20 Hz, bounds and reload");
         } finally {
             BlockRegistry.unregister(98);
+            Files.deleteIfExists(Paths.get(FurnacePersistence.FILE_NAME));
             Files.delete(save);
         }
     }

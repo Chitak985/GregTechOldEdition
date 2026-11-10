@@ -22,8 +22,8 @@ public final class BlockTickVerification {
         require(terrainOnly.gtoe$blockTicker.activeBlockCount() == 0,
                 "Terrain-only worlds must not allocate ticking block instances");
         for (int id = 1; id < ItemCatalog.FIRST_ITEM_ID; id++) {
-            require(BlockRegistry.isTicking(id) == (id == 22),
-                    "Only the furnace main hatch should tick by default: " + id);
+            require(BlockRegistry.isTicking(id) == (id == 22 || id == 24),
+                    "Only furnace hatches should have runtime instances by default: " + id);
         }
         BlockRegistry.register(98, CountingBlock::new);
         try {
@@ -145,11 +145,8 @@ public final class BlockTickVerification {
             require(machine.isFormed() && machine.matchingRotation() == rotation,
                     "Tenth tick must form the furnace in any of the four directions");
             world.setTile(5, 3, 5, 0); // Front slice, bottom-middle hardened stone.
-            gameTicks(world, 27);
-            require(machine.isFormed(), "Checks should be spaced by ten ticks");
-            gameTicks(world, 3);
             require(!machine.isFormed() && machine.matchingRotation() == -1,
-                    "A broken component should invalidate the machine on the next check");
+                    "A broken component should immediately invalidate the machine");
         }
     }
 

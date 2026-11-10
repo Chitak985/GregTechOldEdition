@@ -15,6 +15,7 @@ public final class GuiManager {
     private static final int SCREEN_CRAFTING = 1;
     private static final int SCREEN_DEFINITION = 2;
     private static final int SCREEN_CRAFTING_TABLE = 3;
+    private static final int SCREEN_FURNACE = 4;
     private static final int KEY_E = 18;
     private static final int LEFT_MOUSE_BUTTON = 0;
 
@@ -67,6 +68,7 @@ public final class GuiManager {
     }
 
     public static synchronized void openDefinition(Definition definition) {
+        FurnaceGui.close();
         returnCraftingItems();
         screen = SCREEN_DEFINITION;
         screen_definition = definition;
@@ -75,11 +77,23 @@ public final class GuiManager {
 
     /** Opens the crafting table's dedicated 3x3 screen. */
     public static synchronized void openCraftingTable() {
+        FurnaceGui.close();
         returnCraftingItems();
         screen = SCREEN_CRAFTING_TABLE;
         screen_definition = null;
         scrollRow = 0;
         refreshRecipe();
+        setMouseGrabbed(false);
+    }
+
+    public static synchronized void openFurnace(AdvancedBlock hatch) {
+        if (!(hatch instanceof MachineMultiblock) && !(hatch instanceof FurnaceFuelHatch)) {
+            throw new IllegalArgumentException("Expected a furnace main or fuel hatch");
+        }
+        returnCraftingItems();
+        FurnaceGui.open(hatch);
+        screen = SCREEN_FURNACE;
+        screen_definition = null;
         setMouseGrabbed(false);
     }
 
@@ -105,6 +119,13 @@ public final class GuiManager {
         currentMouseEventOwnedByGui = screen != SCREEN_NONE;
 
         if (screen == SCREEN_NONE) {
+            return;
+        }
+
+        if (screen == SCREEN_FURNACE) {
+            if (!FurnaceGui.valid()) { closeInternal(); return; }
+            FurnaceGui.handleMouse(mouseX, mouseY, button, pressed, wheel,
+                    new Layout(screenWidth, screenHeight));
             return;
         }
 
@@ -156,9 +177,14 @@ public final class GuiManager {
         if (screen == SCREEN_NONE) {
             return;
         }
+        if (screen == SCREEN_FURNACE && !FurnaceGui.valid()) { closeInternal(); return; }
 
         Layout layout = new Layout(screenWidth, screenHeight, activeGridWidth());
         GuiGraphics.drawPanel(layout.panelX, layout.panelY, layout.panelWidth, layout.panelHeight);
+        if (screen == SCREEN_FURNACE) {
+            FurnaceGui.render(layout);
+            return;
+        }
         if (screen == SCREEN_DEFINITION) {
             screen_definition.render(layout);
             return;
@@ -205,6 +231,7 @@ public final class GuiManager {
     }
 
     static synchronized void resetForTests() {
+        FurnaceGui.close();
         returnCraftingItems();
         screen = SCREEN_NONE;
         scrollRow = 0;
@@ -337,10 +364,17 @@ public final class GuiManager {
                     recipe[0], recipe[1], layout.outputX, layout.outputY, layout.craftSlotSize);
         }
 
-        int maxScroll = Math.max(0, Inventory.MAIN_ROWS - 3);
-        if (scrollRow > maxScroll) {
-            scrollRow = maxScroll;
+        renderInventory(layout, scrollRow);
+
+        if (draggedItemId >= 0) {
+            GuiGraphics.drawSlot(mouseX - 11, mouseY - 11, 22, true);
+            GuiGraphics.drawItemIcon(draggedItemId, draggedAmount, mouseX - 11, mouseY - 11, 22);
         }
+    }
+
+    static void renderInventory(Layout layout, int scrollRow) {
+        int maxScroll = Math.max(0, Inventory.MAIN_ROWS - 3);
+        scrollRow = Math.max(0, Math.min(maxScroll, scrollRow));
         GuiGraphics.drawTextSmall("INVENTORY", layout.inventoryX, layout.inventoryY - 13);
         GuiGraphics.drawTextSmall(
                 "ROW " + (scrollRow + 1) + " OF " + (maxScroll + 1),
@@ -360,10 +394,6 @@ public final class GuiManager {
             }
         }
 
-        if (draggedItemId >= 0) {
-            GuiGraphics.drawSlot(mouseX - 11, mouseY - 11, 22, true);
-            GuiGraphics.drawItemIcon(draggedItemId, draggedAmount, mouseX - 11, mouseY - 11, 22);
-        }
     }
 
     private static void craftCurrentRecipe() {
@@ -380,6 +410,7 @@ public final class GuiManager {
     }
 
     private static void closeInternal() {
+        FurnaceGui.close();
         returnCraftingItems();
         screen = SCREEN_NONE;
         screen_definition = null;

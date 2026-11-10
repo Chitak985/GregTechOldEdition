@@ -58,7 +58,9 @@ public final class BlockTicker {
     /** Called after terrain conversion, including when a typed saved world is opened. */
     public static BlockTicker initialize(Object level) {
         try {
-            return new BlockTicker(level);
+            BlockTicker ticker = new BlockTicker(level);
+            FurnacePersistence.load(ticker);
+            return ticker;
         } catch (ReflectiveOperationException error) {
             throw new IllegalStateException("Cannot initialize world block ticking", error);
         }
@@ -78,6 +80,11 @@ public final class BlockTicker {
         BlockTicker ticker = forLevel(level);
         if (ticker != null && ticker.inBounds(x, y, z)) {
             ticker.updateBlock(x, y, z);
+            for (AdvancedBlock block : ticker.blocks.values()) {
+                if (block instanceof MachineMultiblock) {
+                    ((MachineMultiblock) block).onWorldChanged(x, y, z);
+                }
+            }
         }
     }
 
@@ -112,6 +119,9 @@ public final class BlockTicker {
         return blocks.size();
     }
 
+    AdvancedBlock[] blocksSnapshot() { return blocks.values().toArray(new AdvancedBlock[blocks.size()]); }
+    byte[] blockData() { return blockIds; }
+
     public long tickCount() {
         return ticks;
     }
@@ -122,10 +132,12 @@ public final class BlockTicker {
         AdvancedBlock existing = blocks.get(index);
         if (!BlockRegistry.isTicking(id)) {
             if (existing != null) {
+                existing.onRemoved();
                 blocks.remove(index);
                 snapshotDirty = true;
             }
         } else if (existing == null || existing.blockId != id) {
+            if (existing != null) { existing.onRemoved(); }
             blocks.put(index, BlockRegistry.create(level, x, y, z, id));
             snapshotDirty = true;
         }

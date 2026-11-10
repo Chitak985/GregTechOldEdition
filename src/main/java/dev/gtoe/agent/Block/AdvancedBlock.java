@@ -19,4 +19,8 @@ public class AdvancedBlock {
     /** Called once per block tick (20 times per simulation second). */
     public void Tick() {
     }
+
+    /** Called when this position is removed or replaced by a different block ID. */
+    public void onRemoved() {
+    }
 }

@@ -71,6 +71,20 @@ public final class BlockGuiRegistry {
         return true;
     }
 
+    /** Position-aware screens bind their inventory to the actual placed hatch. */
+    public static synchronized boolean openForBlock(Object level, int x, int y, int z, int blockId) {
+        if (blockId == 22 || blockId == 24) {
+            BlockTicker ticker = BlockTicker.forLevel(level);
+            AdvancedBlock block = ticker == null ? null : ticker.blockAt(x, y, z);
+            if (block instanceof MachineMultiblock || block instanceof FurnaceFuelHatch) {
+                GuiManager.openFurnace(block);
+                return true;
+            }
+            return false;
+        }
+        return openForBlock(blockId);
+    }
+
     /**
         Stores the GUI definition data.
         Most parameters are public to make them modifiable if needed.

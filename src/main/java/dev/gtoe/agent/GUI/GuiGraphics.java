@@ -160,6 +160,8 @@ final class GuiGraphics {
 
     private static int[] glyph(char character) {
         switch (character) {
+            case ':': return rows(0, 4, 4, 0, 4, 4, 0);
+            case '!': return rows(4, 4, 4, 4, 4, 0, 4);
             case 'A': return rows(14, 17, 17, 31, 17, 17, 17);
             case 'B': return rows(30, 17, 17, 30, 17, 17, 30);
             case 'C': return rows(14, 17, 16, 16, 16, 17, 14);

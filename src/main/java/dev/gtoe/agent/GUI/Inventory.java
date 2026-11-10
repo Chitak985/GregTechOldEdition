@@ -27,6 +27,23 @@ public final class Inventory {
     private Inventory() {
     }
 
+    /** Add items to the player's inventory; returns false when no slot is available. */
+    public static boolean addItems(int itemId, int amount) {
+        return add(itemId, amount);
+    }
+
+    /** Edit starter items here. Called once at the end of game initialization. */
+    public static void addStarterItems() {
+        addItems(21, 32);
+        addItems(22, 16);
+        addItems(23, 16);
+        addItems(24, 16);
+        addItems(25, 16);
+        addItems(26, 16);
+        addItems(3, 32);
+        addItems(9, 32);
+    }
+
     public static synchronized boolean add(int itemId, int amount) {
         validateItem(itemId, amount);
 

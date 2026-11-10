@@ -60,6 +60,7 @@ public final class ItemCatalog {
             case 26: return "Furnace Main Chamber";
             case 27: return "Cupronickel Coil Block";
             case 28: return "Crafting Table";
+            case 29: return "Tempered Stone";  // smelted stone
             default: return "Unknown Block";
         }
     }

@@ -47,6 +47,7 @@ public final class TransformerVerification {
         require(TerrainLayers.blockIdForY(40) == 1, "Y=40 should use block ID 1");
         verifyTreeGeneration();
         BlockTickVerification.run();
+        FurnaceVerification.run();
         BlockPickingVerification.run();
 
         Inventory.clearForTests();

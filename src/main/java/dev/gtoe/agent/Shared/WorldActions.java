@@ -23,7 +23,7 @@ public final class WorldActions {
             }
 
             // Open block GUI if not holding shift
-            if (!GuiManager.isShiftDown() && BlockGuiRegistry.openForBlock(blockId)) {
+            if (!GuiManager.isShiftDown() && BlockGuiRegistry.openForBlock(level, x, y, z, blockId)) {
                 return;
             }
 

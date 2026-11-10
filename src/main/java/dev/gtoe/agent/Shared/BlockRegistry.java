@@ -6,6 +6,7 @@ public final class BlockRegistry {
 
     static {
         register(22, MachineMultiblock::new);
+        register(24, FurnaceFuelHatch::new);
     }
 
     private BlockRegistry() {

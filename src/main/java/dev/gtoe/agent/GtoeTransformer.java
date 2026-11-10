@@ -277,6 +277,15 @@ final class GtoeTransformer implements ClassFileTransformer {
                 injected[0] = true;
                 return new MethodVisitor(Opcodes.ASM9, delegate) {
                     @Override
+                    public void visitInsn(int opcode) {
+                        if (opcode == Opcodes.RETURN) {
+                            super.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/gtoe/agent/Inventory",
+                                    "addStarterItems", "()V", false);
+                        }
+                        super.visitInsn(opcode);
+                    }
+
+                    @Override
                     public void visitCode() {
                         super.visitCode();
                         super.visitFieldInsn(
@@ -444,11 +453,12 @@ final class GtoeTransformer implements ClassFileTransformer {
                 }
 
                 if (("setTile".equals(name) && "(IIII)V".equals(descriptor))
-                        || ("load".equals(name) && "()V".equals(descriptor))) {
+                        || (("load".equals(name) || "save".equals(name)) && "()V".equals(descriptor))) {
                     final boolean changingTile = "setTile".equals(name);
+                    final boolean saving = "save".equals(name);
                     if (changingTile) {
                         setTilePatched[0] = true;
-                    } else {
+                    } else if (!saving) {
                         loadPatched[0] = true;
                     }
                     return new MethodVisitor(Opcodes.ASM9, delegate) {
@@ -461,8 +471,9 @@ final class GtoeTransformer implements ClassFileTransformer {
                                     super.visitVarInsn(Opcodes.ILOAD, 2);
                                     super.visitVarInsn(Opcodes.ILOAD, 3);
                                 }
-                                super.visitMethodInsn(Opcodes.INVOKESTATIC, BLOCK_TICKER,
-                                        changingTile ? "onBlockChanged" : "onLevelLoaded",
+                                super.visitMethodInsn(Opcodes.INVOKESTATIC,
+                                        saving ? "dev/gtoe/agent/FurnacePersistence" : BLOCK_TICKER,
+                                        saving ? "save" : changingTile ? "onBlockChanged" : "onLevelLoaded",
                                         changingTile ? "(Ljava/lang/Object;III)V" : "(Ljava/lang/Object;)V",
                                         false);
                             }

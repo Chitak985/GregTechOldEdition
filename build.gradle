@@ -16,6 +16,7 @@ repositories {
 dependencies {
     implementation 'org.ow2.asm:asm:9.8'
     compileOnly 'org.lwjgl.lwjgl:lwjgl:2.9.3'
+    testCompileOnly 'org.lwjgl.lwjgl:lwjgl:2.9.3' // Optional offscreen GUI verification.
 }
 
 def generatedAgentResources = layout.buildDirectory.dir('generated/agent-resources')
