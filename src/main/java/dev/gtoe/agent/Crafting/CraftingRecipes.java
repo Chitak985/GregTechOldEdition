@@ -4,10 +4,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/** Declarative recipe registry shared by the 2x2 inventory and 3x3 table. */
+/** All crafting recipes used by both 2x2 and 3x3 tables. */
 public final class CraftingRecipes {
+    /** Positions in the 2x2 grid mapped to a 3x3 grid **/
     private static final int[] PLAYER_GRID_POSITIONS = {1, 2, 4, 5};
-    /** List of all loaded recipes. */
+    /** List of all loaded recipes */
     private static final List<Recipe> RECIPES = new ArrayList<>();
 
     static {
@@ -64,22 +65,24 @@ public final class CraftingRecipes {
 
         // Furnace Main Hatch
         registerShaped(
-                "AAA" +
-                "ABA" +
-                "AAA",
+                "ACA" +
+                "CBC" +
+                "ACA",
                 22, 1,
                 ingredient('A', 3),
-                ingredient('B', 107));
+                ingredient('B', 107),
+                ingredient('C', 21));
 
         // Furnace Fuel Hatch
         registerShaped(
-                "AAA" +
+                "ADA" +
                 "CBC" +
-                "AAA",
+                "ADA",
                 24, 1,
                 ingredient('A', 3),
                 ingredient('B', 107),
-                ingredient('C', 106));
+                ingredient('C', 106),
+                ingredient('D', 21));
 
         // Furnace Exhaust
         registerShaped(
@@ -106,12 +109,69 @@ public final class CraftingRecipes {
                 25, 1,
                 ingredient('A', 21),
                 ingredient('B', 106));
+            
+        // Tempered Stone-Reinforced Stick
+        registerShaped(
+                "CA " +
+                "BC " +
+                "   ",
+                109, 1,
+                ingredient('A', 100),
+                ingredient('B', 29),
+                ingredient('C', 108));
+
+        // Tempered Furnace Main Hatch
+        registerShaped(
+                "ACA" +
+                "CBC" +
+                "ACA",
+                30, 1,
+                ingredient('A', 21),
+                ingredient('B', 109),
+                ingredient('C', 29));
+
+        // Tempered Furnace Fuel Hatch
+        registerShaped(
+                "ADA" +
+                "CBC" +
+                "ADA",
+                32, 1,
+                ingredient('A', 21),
+                ingredient('B', 109),
+                ingredient('C', 108),
+                ingredient('D', 29));
+
+        // Tempered Furnace Exhaust
+        registerShaped(
+                "A A" +
+                "A A" +
+                "A A",
+                31, 1,
+                ingredient('A', 29));
+
+        // Tempered Furnace Main Chamber
+        registerShaped(
+                "ABA" +
+                "ABA" +
+                "AAA",
+                34, 1,
+                ingredient('A', 29),
+                ingredient('B', 108));
+
+        // Tempered Furnace Fuel Chamber
+        registerShaped(
+                "AAA" +
+                "BBB" +
+                "ABA",
+                33, 1,
+                ingredient('A', 29),
+                ingredient('B', 108));
     }
 
     private CraftingRecipes() {
     }
 
-    /** Associates one of the allowed pattern symbols A-Z with an item ID. */
+    /** Associates a character with an item ID to use for crafting recipes. */
     public static Ingredient ingredient(char symbol, int itemId) {
         requireAllowedSymbol(symbol);
         if (itemId < 0) {
@@ -125,7 +185,7 @@ public final class CraftingRecipes {
      * empty cells; every other character must be A-Z and have an assignment.
      * If you have an IDE with parameter hints you should disable them
      * for this function to make it easier to read the patterns.
-     */
+     **/
     public static synchronized void registerShaped(
             String pattern,
             int outputItemId,
