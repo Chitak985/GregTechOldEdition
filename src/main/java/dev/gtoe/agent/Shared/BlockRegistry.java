@@ -1,10 +1,12 @@
 package dev.gtoe.agent;
 
-/** Opt block IDs into ticking here before a world loads. Ordinary terrain has no instances. */
+/** Registers special blocks like MachineMultiblock and AdvancedBlock. **/
 public final class BlockRegistry {
+    /** List of special block "factories" **/
     private static final Factory[] FACTORIES = new Factory[ItemCatalog.FIRST_ITEM_ID];
 
     static {
+        // Register blocks here with a factory
         register(22, MachineMultiblock::new);
         register(24, FurnaceFuelHatch::new);
     }
@@ -12,6 +14,7 @@ public final class BlockRegistry {
     private BlockRegistry() {
     }
 
+    /** Register a block using a factory and its ID. **/
     public static void register(int blockId, Factory factory) {
         if (blockId <= 0 || !ItemCatalog.isBlock(blockId) || factory == null) {
             throw new IllegalArgumentException("Expected a solid block ID and a block factory");
@@ -19,6 +22,7 @@ public final class BlockRegistry {
         FACTORIES[blockId] = factory;
     }
 
+    /** Unregister a block using its ID. **/
     public static void unregister(int blockId) {
         if (blockId <= 0 || !ItemCatalog.isBlock(blockId)) {
             throw new IllegalArgumentException("Expected a solid block ID");
@@ -26,11 +30,13 @@ public final class BlockRegistry {
         FACTORIES[blockId] = null;
     }
 
+    /** Check if a block can tick. **/
     public static boolean isTicking(int blockId) {
         return blockId > 0 && blockId < FACTORIES.length && FACTORIES[blockId] != null;
     }
 
-    static AdvancedBlock create(Object level, int x, int y, int z, int blockId) {
+    /** Create an AdvancedBlock with an ID at a position. **/
+    public static AdvancedBlock create(Object level, int x, int y, int z, int blockId) {
         if (!isTicking(blockId)) {
             return null;
         }
