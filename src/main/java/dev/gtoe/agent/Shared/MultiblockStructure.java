@@ -1,48 +1,30 @@
 package dev.gtoe.agent;
 
-/* Multiblock structures:
-Shared:
-" " = Air
-"?" = Any block
-"-" = Any block including air
-"!" = Controller Block
------ Furnace -----
--2-
-212
-252
-111
-
-262
-141
-535
-111
-
--2-
-2!2
-252
-111
-
-! = Furnace Main Hatch (22)
-1 = Hardened Stone (21)
-2 = Stone (3)
-3 = Furnace Fuel Chamber (25)
-4 = Furnace Main Chamber (26)
-5 = Furnace Fuel Hatch (24)
-6 = Furnace Exhaust (23)
------
- */
-
 import java.util.*;
 
-/** Instance of a multiblock structure that defines what blocks are used in the structure and where. **/
+/**
+    Instance of a multiblock structure that defines what blocks are used in the structure and where.
+    Symbol mappings present in every structure mapping:
+    " " = Mandatory air block
+    "?" = Any block except air
+    "-" = Any block including air (skip block)
+    "!" = Controller block (must be a signle one per structure)
+**/
 public class MultiblockStructure {
+    /** ID of the controller block of the structure **/
     public int controllerBlockId;
+    /** The structure as a 2D string list **/
     public List<List<String>> structure;
+    /** The block mappings as char: int **/
     public HashMap<Character, Integer> blockMappings;
+    /** The slice the controller block is on **/
     public int controllerStructureSlice;
+    /** The row the controller block is on **/
     public int controllerStructureRow;
+    /** The row index the controller block is on **/
     public int controllerStructureRowIndex;
 
+    /** Create a multiblock structure instance with the controller block, 2D structure data, and block mappings. **/
     public MultiblockStructure(int controllerBlockId,
                                List<List<String>> structure,
                                HashMap<Character, Integer> blockMappings) {
@@ -100,26 +82,32 @@ public class MultiblockStructure {
         }
     }
 
-    /** Check if the multiblock can form. **/
-    public boolean CheckStructure(Object level,
-                                  int x, int y, int z) {  // Controller position
-        return FindMatchingRotation(level, x, y, z) >= 0;
-    }
-
-    /** Try all four horizontal rotations. Returns quarter turns, or -1 if none match. */
+    /**
+        Try all four horizontal rotations for the structure.
+        This tries every horizontal dircetion (North, East, South, West).
+        If it fails, it will return -1.
+    **/
     public int FindMatchingRotation(Object level, int x, int y, int z) {
         if (level == null) {
             throw new IllegalArgumentException("Level access is required to check the structure!");
         }
         for (int rotation = 0; rotation < 4; rotation++) {
-            if (matchesRotation(level, x, y, z, rotation)) {
+            if (CheckStructure(level, x, y, z, rotation)) {
                 return rotation;
             }
         }
         return -1;
     }
 
-    private boolean matchesRotation(Object level, int x, int y, int z, int rotation) {
+    /** Check if the multiblock can form, tries every rotation. **/
+    public boolean CheckStructure(Object level,
+                                  int x, int y, int z) {  // Controller position
+        return FindMatchingRotation(level, x, y, z) >= 0;
+    }
+    /** Check if the multiblock can form with a specific rotation **/
+    public boolean CheckStructure(Object level,
+                                  int x, int y, int z,  // Controller position
+                                  int rotation) {  // Horizontal rotation integer
         for (int slice = 0; slice < structure.size(); slice++) {
             List<String> rows = structure.get(slice);
             for (int row = 0; row < rows.size(); row++) {
