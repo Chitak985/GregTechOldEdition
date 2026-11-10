@@ -1,6 +1,9 @@
 package dev.gtoe.agent;
 
-/** Shared item/block identity rules. Block IDs occupy 0-99; ordinary items start at 100. */
+/**
+    The catalog of all items along with some helper functions.
+    Item IDs are after 100, block IDs are 0-99.
+**/
 public final class ItemCatalog {
     public static final int FIRST_ITEM_ID = 100;
 
@@ -25,6 +28,8 @@ public final class ItemCatalog {
             case 105: return "Bronze Ingot";
             case 106: return "Flint";
             case 107: return "Stone-Reinforced Stick";
+            case 108: return "Tempered Flint";
+            case 109: return "Tempered Stone-Reinforced Stick";
             default: return "Unknown Item";
         }
     }
@@ -53,14 +58,23 @@ public final class ItemCatalog {
             case 19: return "Basic Machine";  // LV machine
             case 20: return "Gravel";
             case 21: return "Hardened Stone";  // 2 stone 2 flint
-            case 22: return "Furnace Main Hatch";
-            case 23: return "Furnace Exhaust";
-            case 24: return "Furnace Fuel Hatch";
-            case 25: return "Furnace Fuel Chamber";
-            case 26: return "Furnace Main Chamber";
+            case 22: return "Furnace Main Hatch";  // T1 Furnace controller
+            case 23: return "Furnace Exhaust";  // T1 Furnace muffler
+            case 24: return "Furnace Fuel Hatch";  // T1 Furnace fuel input
+            case 25: return "Furnace Fuel Chamber";  // T1 Furnace internal block
+            case 26: return "Furnace Main Chamber";  // T1 Furnace internal block
             case 27: return "Cupronickel Coil Block";
             case 28: return "Crafting Table";
             case 29: return "Tempered Stone";  // smelted stone
+            case 30: return "Tempered Furnace Main Hatch";  // T2 Furnace controller
+            case 31: return "Tempered Furnace Exhaust";  // T2 Furnace muffler
+            case 32: return "Tempered Furnace Fuel Hatch";  // T2 Furnace fuel input
+            case 33: return "Tempered Furnace Fuel Chamber";  // T2 Furnace internal block
+            case 34: return "Tempered Furnace Main Chamber";  // T2 Furnace internal block
+            case 35: return "Coke Oven Main Hatch";  // Coke Oven controller
+            case 36: return "Coke Oven Fuel Hatch";  // Coke Oven fuel input
+            case 37: return "Coke Oven Output Hatch";  // Coke Oven output
+            case 38: return "Coke Oven Exhaust";  // Coke Oven muffler
             default: return "Unknown Block";
         }
     }
