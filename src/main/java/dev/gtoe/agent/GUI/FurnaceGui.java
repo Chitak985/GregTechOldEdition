@@ -27,6 +27,13 @@ final class FurnaceGui {
         hatch = null;
     }
 
+    static void snapshotPlayerDrag(Inventory.Stack[] inventory) {
+        if (held != null && sourcePlayer >= 0) {
+            inventory[sourcePlayer] = new Inventory.Stack(held.itemId, held.count);
+        }
+        // A drag from a machine is already included in MachineSlot's save reservation.
+    }
+
     private static MachineSlot input() {
         return hatch instanceof MachineMultiblock ? ((MachineMultiblock) hatch).input
                 : ((FurnaceFuelHatch) hatch).input;

@@ -59,6 +59,7 @@ public final class InstalledGameVerification {
         final int[] blockTickHooks = {0};
         final boolean[] sixtyHzTimer = {false};
         final boolean[] cpuPickingFound = {false};
+        final boolean[] playerRestoreFound = {false};
         final int[] filteredMouseDeltas = {0};
         final int[] originalSetTileCalls = {0};
         new ClassReader(bytecode).accept(new ClassVisitor(Opcodes.ASM9) {
@@ -80,6 +81,11 @@ public final class InstalledGameVerification {
                     public void visitMethodInsn(
                             int opcode, String owner, String methodName, String methodDescriptor,
                             boolean isInterface) {
+                        if ("init".equals(name) && "dev/gtoe/agent/PlayerPersistence".equals(owner)
+                                && "initialize".equals(methodName)
+                                && "(Ljava/lang/Object;Ljava/lang/Object;)V".equals(methodDescriptor)) {
+                            playerRestoreFound[0] = true;
+                        }
                         if ("pick".equals(name) && "(F)V".equals(descriptor)) {
                             require(!owner.startsWith("org/lwjgl/")
                                             && !"com/mojang/rubydung/level/LevelRenderer".equals(owner),
@@ -146,6 +152,7 @@ public final class InstalledGameVerification {
             }
         }, 0);
         require(messageFound[0], "RubyDung.init()V does not contain the injected message");
+        require(playerRestoreFound[0], "RubyDung.init must restore the player's saved inventory and position");
         require(keyboardSelectionFound[0], "RubyDung does not forward number-key events");
         require(selectedPlacementFound[0], "RubyDung placement does not use the selected block ID");
         require(breakActionFound[0], "RubyDung breaking is not routed through inventory actions");
@@ -199,6 +206,7 @@ public final class InstalledGameVerification {
         final boolean[] tickerInitialized = {false};
         final boolean[] blockChangeFound = {false};
         final boolean[] reloadFound = {false};
+        final boolean[] playerSaveFound = {false};
 
         new ClassReader(bytecode).accept(new ClassVisitor(Opcodes.ASM9) {
             @Override
@@ -248,11 +256,15 @@ public final class InstalledGameVerification {
                     };
                 }
 
-                if ("setTile".equals(name) || "load".equals(name)) {
+                if ("setTile".equals(name) || "load".equals(name) || "save".equals(name)) {
                     return new MethodVisitor(Opcodes.ASM9) {
                         @Override
                         public void visitMethodInsn(int opcode, String owner, String method,
                                 String methodDescriptor, boolean isInterface) {
+                            if ("save".equals(name) && "dev/gtoe/agent/PlayerPersistence".equals(owner)
+                                    && "save".equals(method) && "(Ljava/lang/Object;)V".equals(methodDescriptor)) {
+                                playerSaveFound[0] = true;
+                            }
                             if ("dev/gtoe/agent/BlockTicker".equals(owner)) {
                                 if ("setTile".equals(name) && "onBlockChanged".equals(method)) {
                                     blockChangeFound[0] = true;
@@ -270,6 +282,7 @@ public final class InstalledGameVerification {
         }, 0);
 
         require(getterFound[0], "Level block-ID getter was not added");
+        require(playerSaveFound[0], "Level.save must also save the player's inventory and position");
         require(applyFound[0], "Level constructor does not apply Y layers");
         require(nonzeroCheckFound[0], "Level.isTile does not accept every nonzero block ID");
         require(tickerFieldFound[0] && tickerInitialized[0] && blockChangeFound[0] && reloadFound[0],

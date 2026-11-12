@@ -279,8 +279,12 @@ final class GtoeTransformer implements ClassFileTransformer {
                     @Override
                     public void visitInsn(int opcode) {
                         if (opcode == Opcodes.RETURN) {
-                            super.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/gtoe/agent/Inventory",
-                                    "addStarterItems", "()V", false);
+                            super.visitVarInsn(Opcodes.ALOAD, 0);
+                            super.visitFieldInsn(Opcodes.GETFIELD, RUBY_DUNG, "level", "L" + LEVEL + ";");
+                            super.visitVarInsn(Opcodes.ALOAD, 0);
+                            super.visitFieldInsn(Opcodes.GETFIELD, RUBY_DUNG, "player", "L" + PLAYER + ";");
+                            super.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/gtoe/agent/PlayerPersistence",
+                                    "initialize", "(Ljava/lang/Object;Ljava/lang/Object;)V", false);
                         }
                         super.visitInsn(opcode);
                     }
@@ -476,6 +480,11 @@ final class GtoeTransformer implements ClassFileTransformer {
                                         saving ? "save" : changingTile ? "onBlockChanged" : "onLevelLoaded",
                                         changingTile ? "(Ljava/lang/Object;III)V" : "(Ljava/lang/Object;)V",
                                         false);
+                                if (saving) {
+                                    super.visitVarInsn(Opcodes.ALOAD, 0);
+                                    super.visitMethodInsn(Opcodes.INVOKESTATIC, "dev/gtoe/agent/PlayerPersistence",
+                                            "save", "(Ljava/lang/Object;)V", false);
+                                }
                             }
                             super.visitInsn(opcode);
                         }

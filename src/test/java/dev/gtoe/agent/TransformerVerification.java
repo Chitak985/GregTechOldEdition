@@ -319,6 +319,8 @@ public final class TransformerVerification {
         writer.visitField(Opcodes.ACC_PRIVATE, "height", "I", null, null).visitEnd();
         writer.visitField(Opcodes.ACC_PRIVATE, "level", "L" + GtoeTransformer.LEVEL + ";",
                 null, null).visitEnd();
+        writer.visitField(Opcodes.ACC_PRIVATE, "player", "L" + GtoeTransformer.PLAYER + ";",
+                null, null).visitEnd();
 
         MethodVisitor tick = writer.visitMethod(Opcodes.ACC_PUBLIC, "tick", "()V", null, null);
         tick.visitCode();

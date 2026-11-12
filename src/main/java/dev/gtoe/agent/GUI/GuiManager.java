@@ -429,9 +429,47 @@ public final class GuiManager {
     private static void returnGridItems(int[] craftingGrid) {
         for (int index = 0; index < craftingGrid.length; index++) {
             if (craftingGrid[index] >= 0) {
-                Inventory.add(craftingGrid[index], 1);
-                craftingGrid[index] = Inventory.EMPTY_ITEM_ID;
+                if (Inventory.add(craftingGrid[index], 1)) {
+                    craftingGrid[index] = Inventory.EMPTY_ITEM_ID;
+                }
             }
+        }
+    }
+
+    /** Snapshot transient player items without closing the GUI or changing live stacks. */
+    static synchronized int[][] craftingSnapshot(Inventory.Stack[] inventory) {
+        int[][] grids = {PLAYER_CRAFTING_GRID.clone(), CraftingTableGui.grid().clone()};
+        if (draggedItemId >= 0) {
+            if (draggedSourceInventorySlot >= 0) {
+                inventory[draggedSourceInventorySlot] = new Inventory.Stack(draggedItemId, draggedAmount);
+            } else if (draggedSourceCraftSlot >= 0) {
+                grids[screen == SCREEN_CRAFTING_TABLE ? 1 : 0][draggedSourceCraftSlot] = draggedItemId;
+            }
+        }
+        FurnaceGui.snapshotPlayerDrag(inventory);
+        return grids;
+    }
+
+    static synchronized void resetForWorld() {
+        closeInternal();
+        Arrays.fill(PLAYER_CRAFTING_GRID, Inventory.EMPTY_ITEM_ID);
+        Arrays.fill(CraftingTableGui.grid(), Inventory.EMPTY_ITEM_ID);
+        scrollRow = 0;
+        currentMouseEventOwnedByGui = false;
+    }
+
+    static synchronized void restoreCrafting(int[][] grids) {
+        System.arraycopy(grids[0], 0, PLAYER_CRAFTING_GRID, 0, 4);
+        System.arraycopy(grids[1], 0, CraftingTableGui.grid(), 0, 9);
+        boolean table = false;
+        boolean player = false;
+        for (int id : grids[0]) { player |= id >= 0; }
+        for (int id : grids[1]) { table |= id >= 0; }
+        // Reopen a grid with saved ingredients so even a completely full inventory loses nothing.
+        if (table || player) {
+            screen = table ? SCREEN_CRAFTING_TABLE : SCREEN_CRAFTING;
+            refreshRecipe();
+            setMouseGrabbed(false);
         }
     }
 

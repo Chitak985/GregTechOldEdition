@@ -32,7 +32,7 @@ public final class Inventory {
         return add(itemId, amount);
     }
 
-    /** Edit starter items here. Called once at the end of game initialization. */
+    /** Edit starter items here. Granted only when no saved player inventory is available. */
     public static void addStarterItems() {
         addItems(21, 32);
         addItems(22, 16);
@@ -201,6 +201,24 @@ public final class Inventory {
     static synchronized void clearForTests() {
         Arrays.fill(ITEM_IDS, EMPTY_ITEM_ID);
         Arrays.fill(COUNTS, 0);
+    }
+
+    static synchronized Stack[] snapshot() {
+        Stack[] snapshot = new Stack[TOTAL_SLOT_COUNT];
+        for (int slot = 0; slot < TOTAL_SLOT_COUNT; slot++) {
+            if (COUNTS[slot] > 0) { snapshot[slot] = new Stack(ITEM_IDS[slot], COUNTS[slot]); }
+        }
+        return snapshot;
+    }
+
+    static synchronized void restoreContents(Stack[] snapshot) {
+        if (snapshot == null || snapshot.length != TOTAL_SLOT_COUNT) {
+            throw new IllegalArgumentException("Unexpected inventory save size");
+        }
+        for (int slot = 0; slot < TOTAL_SLOT_COUNT; slot++) {
+            ITEM_IDS[slot] = snapshot[slot] == null ? EMPTY_ITEM_ID : snapshot[slot].itemId;
+            COUNTS[slot] = snapshot[slot] == null ? 0 : snapshot[slot].count;
+        }
     }
 
     private static int findItem(int itemId) {

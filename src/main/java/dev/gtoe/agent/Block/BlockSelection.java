@@ -16,6 +16,13 @@ public final class BlockSelection {
         return selectedHotbarIndex;
     }
 
+    public static void selectHotbarSlot(int index) {
+        if (index < 0 || index >= Inventory.HOTBAR_SLOT_COUNT) {
+            throw new IllegalArgumentException("Hotbar slot must be 0-8");
+        }
+        selectedHotbarIndex = index;
+    }
+
     public static int selectedInventorySlot() {
         return Inventory.HOTBAR_START + selectedHotbarIndex;
     }
