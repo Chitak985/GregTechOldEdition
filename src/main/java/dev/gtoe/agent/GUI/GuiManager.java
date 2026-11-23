@@ -47,6 +47,15 @@ public final class GuiManager {
 
     /** Returns true when the event belongs to a GUI and block selection should ignore it. */
     public static synchronized boolean handleKeyEvent(int keyCode, boolean pressed) {
+        char character = 0;
+        if (isCraftingScreen() && RecipeBook.isSearchFocused() && pressed) {
+            try { character = Keyboard.getEventCharacter(); } catch (Throwable ignored) { }
+        }
+        return handleKeyEvent(keyCode, pressed, character);
+    }
+
+    static synchronized boolean handleKeyEvent(int keyCode, boolean pressed, char character) {
+        if (isCraftingScreen() && RecipeBook.handleKey(keyCode, pressed, character)) { return true; }
         if (!pressed) {
             return screen != SCREEN_NONE;
         }
@@ -68,6 +77,7 @@ public final class GuiManager {
     }
 
     public static synchronized void openDefinition(Definition definition) {
+        RecipeBook.close();
         FurnaceGui.close();
         returnCraftingItems();
         screen = SCREEN_DEFINITION;
@@ -77,6 +87,7 @@ public final class GuiManager {
 
     /** Opens the crafting table's dedicated 3x3 screen. */
     public static synchronized void openCraftingTable() {
+        RecipeBook.close();
         FurnaceGui.close();
         returnCraftingItems();
         screen = SCREEN_CRAFTING_TABLE;
@@ -90,6 +101,7 @@ public final class GuiManager {
         if (!(hatch instanceof MachineMultiblock) && !(hatch instanceof FurnaceFuelHatch)) {
             throw new IllegalArgumentException("Expected a furnace main or fuel hatch");
         }
+        RecipeBook.close();
         returnCraftingItems();
         FurnaceGui.open(hatch);
         screen = SCREEN_FURNACE;
@@ -129,6 +141,13 @@ public final class GuiManager {
             return;
         }
 
+        Layout layout = craftingLayout(screenWidth, screenHeight);
+        if (isCraftingScreen() && RecipeBook.handleMouse(mouseX, mouseY, button, pressed, wheel,
+                layout, activeCraftingGrid(), draggedItemId >= 0)) {
+            if (button == LEFT_MOUSE_BUTTON && !pressed && draggedItemId >= 0) { returnDraggedToSource(); }
+            return;
+        }
+
         if (isCraftingScreen() && wheel != 0) {
             int maxScroll = Math.max(0, Inventory.MAIN_ROWS - 3);
             if (wheel < 0) {
@@ -142,7 +161,6 @@ public final class GuiManager {
             return;
         }
 
-        Layout layout = new Layout(screenWidth, screenHeight, activeGridWidth());
         if (screen == SCREEN_DEFINITION) {
             if (pressed) {
                 for (GUIButton buttonDefinition : screen_definition.buttons) {
@@ -179,7 +197,7 @@ public final class GuiManager {
         }
         if (screen == SCREEN_FURNACE && !FurnaceGui.valid()) { closeInternal(); return; }
 
-        Layout layout = new Layout(screenWidth, screenHeight, activeGridWidth());
+        Layout layout = craftingLayout(screenWidth, screenHeight);
         GuiGraphics.drawPanel(layout.panelX, layout.panelY, layout.panelWidth, layout.panelHeight);
         if (screen == SCREEN_FURNACE) {
             FurnaceGui.render(layout);
@@ -191,6 +209,11 @@ public final class GuiManager {
         }
 
         renderCrafting(layout, activeCraftingGrid());
+        RecipeBook.render(layout, activeCraftingGrid(), mouseX, mouseY);
+        if (draggedItemId >= 0) {
+            GuiGraphics.drawSlot(mouseX - 11, mouseY - 11, 22, true);
+            GuiGraphics.drawItemIcon(draggedItemId, draggedAmount, mouseX - 11, mouseY - 11, 22);
+        }
     }
 
     /** Draws the selected nine-slot hotbar even when no GUI screen is open. */
@@ -231,6 +254,7 @@ public final class GuiManager {
     }
 
     static synchronized void resetForTests() {
+        RecipeBook.reset();
         FurnaceGui.close();
         returnCraftingItems();
         screen = SCREEN_NONE;
@@ -347,13 +371,25 @@ public final class GuiManager {
                 "DRAG ITEMS TO THE " + layout.gridColumns + "X" + layout.gridColumns + " GRID",
                 layout.panelX + 16, layout.panelY + 34);
 
+        int[] preview = RecipeBook.preview();
+        boolean ghosts = false;
         for (int index = 0; index < craftingGrid.length; index++) {
             int x = layout.gridX + (index % layout.gridColumns) * layout.gridPitch;
             int y = layout.gridY + (index / layout.gridColumns) * layout.gridPitch;
             GuiGraphics.drawSlot(x, y, layout.craftSlotSize, false);
             if (craftingGrid[index] >= 0) {
                 GuiGraphics.drawItemIcon(craftingGrid[index], 1, x, y, layout.craftSlotSize);
+            } else if (preview != null && preview[index] >= 0) {
+                GuiGraphics.drawItemIcon(preview[index], 1, x, y, layout.craftSlotSize);
+                GuiGraphics.fillRect(x + 2, y + 2, layout.craftSlotSize - 4, layout.craftSlotSize - 4,
+                        0.24f, 0.24f, 0.27f, 0.65f);
+                ghosts = true;
             }
+        }
+        if (RecipeBook.notice() != null) {
+            GuiGraphics.drawTextSmall(RecipeBook.notice(), layout.panelX + 16, layout.panelY + 157);
+        } else if (ghosts) {
+            GuiGraphics.drawTextSmall("PREVIEW - SELECT RECIPE TO FILL", layout.panelX + 16, layout.panelY + 157);
         }
 
         int[] recipe = matchedRecipe;
@@ -365,11 +401,6 @@ public final class GuiManager {
         }
 
         renderInventory(layout, scrollRow);
-
-        if (draggedItemId >= 0) {
-            GuiGraphics.drawSlot(mouseX - 11, mouseY - 11, 22, true);
-            GuiGraphics.drawItemIcon(draggedItemId, draggedAmount, mouseX - 11, mouseY - 11, 22);
-        }
     }
 
     static void renderInventory(Layout layout, int scrollRow) {
@@ -410,6 +441,7 @@ public final class GuiManager {
     }
 
     private static void closeInternal() {
+        RecipeBook.close();
         FurnaceGui.close();
         returnCraftingItems();
         screen = SCREEN_NONE;
@@ -452,6 +484,7 @@ public final class GuiManager {
 
     static synchronized void resetForWorld() {
         closeInternal();
+        RecipeBook.reset();
         Arrays.fill(PLAYER_CRAFTING_GRID, Inventory.EMPTY_ITEM_ID);
         Arrays.fill(CraftingTableGui.grid(), Inventory.EMPTY_ITEM_ID);
         scrollRow = 0;
@@ -513,9 +546,59 @@ public final class GuiManager {
     }
 
     private static void refreshRecipe() {
+        RecipeBook.onGridChanged();
         matchedRecipe = isCraftingScreen()
                 ? recipeFor(activeCraftingGrid())
                 : new int[] {-1, 0};
+    }
+
+    /** Stages the whole move so unavailable ingredients or a full inventory cannot lose items. */
+    static synchronized boolean fillRecipe(int[] wanted) {
+        if (!isCraftingScreen() || draggedItemId >= 0 || wanted.length != activeCraftingGrid().length) { return false; }
+        int[] unused = activeCraftingGrid().clone();
+        Inventory.Stack[] inventory = Inventory.snapshot();
+        for (int id : wanted) {
+            if (id < 0) { continue; }
+            boolean found = false;
+            for (int slot = 0; slot < unused.length; slot++) {
+                if (unused[slot] == id) { unused[slot] = Inventory.EMPTY_ITEM_ID; found = true; break; }
+            }
+            if (found) { continue; }
+            for (int slot = 0; slot < inventory.length; slot++) {
+                Inventory.Stack stack = inventory[slot];
+                if (stack != null && stack.itemId == id) {
+                    inventory[slot] = stack.count == 1 ? null : new Inventory.Stack(id, stack.count - 1);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) { return false; }
+        }
+        for (int id : unused) {
+            if (id < 0) { continue; }
+            int target = -1;
+            for (int slot = 0; slot < inventory.length; slot++) {
+                Inventory.Stack stack = inventory[slot];
+                if (stack != null && stack.itemId == id && stack.count < Integer.MAX_VALUE) { target = slot; break; }
+            }
+            if (target < 0) {
+                for (int index = 0; index < inventory.length; index++) {
+                    int slot = (Inventory.HOTBAR_START + index) % inventory.length;
+                    if (inventory[slot] == null) { target = slot; break; }
+                }
+            }
+            if (target < 0) { return false; }
+            Inventory.Stack existing = inventory[target];
+            inventory[target] = new Inventory.Stack(id, existing == null ? 1 : existing.count + 1);
+        }
+        Inventory.restoreContents(inventory);
+        System.arraycopy(wanted, 0, activeCraftingGrid(), 0, wanted.length);
+        refreshRecipe();
+        return true;
+    }
+
+    static Layout craftingLayout(int width, int height) {
+        return new Layout(width, height, activeGridWidth(), isCraftingScreen() && RecipeBook.isOpen());
     }
 
     private static void setMouseGrabbed(boolean grabbed) {
@@ -557,8 +640,15 @@ public final class GuiManager {
         }
 
         Layout(int screenWidth, int screenHeight, int gridColumns) {
+            this(screenWidth, screenHeight, gridColumns, false);
+        }
+
+        Layout(int screenWidth, int screenHeight, int gridColumns, boolean bookOpen) {
             this.gridColumns = gridColumns;
-            panelX = Math.max(4, (screenWidth - panelWidth) / 2);
+            int combinedWidth = panelWidth + RecipeBook.Layout.WIDTH + RecipeBook.Layout.GAP;
+            panelX = bookOpen && screenWidth >= combinedWidth + 8
+                    ? (screenWidth - combinedWidth) / 2 + RecipeBook.Layout.WIDTH + RecipeBook.Layout.GAP
+                    : Math.max(4, (screenWidth - panelWidth) / 2);
             panelY = Math.max(20, (screenHeight - panelHeight) / 2);
             gridX = panelX + (gridColumns == 3 ? 54 : 70);
             gridY = panelY + 58;

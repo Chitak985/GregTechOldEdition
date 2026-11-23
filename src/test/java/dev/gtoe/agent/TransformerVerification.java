@@ -80,6 +80,7 @@ public final class TransformerVerification {
                 "An empty hotbar slot must not be placeable");
 
         verifyInventoryAndRecipes();
+        RecipeBookVerification.run();
 
         System.out.println("Transformer verification passed: trees, inventory, recipes, input, and world actions are correct");
     }

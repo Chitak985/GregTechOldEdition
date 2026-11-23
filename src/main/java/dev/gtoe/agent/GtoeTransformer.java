@@ -92,6 +92,20 @@ final class GtoeTransformer implements ClassFileTransformer {
                     String[] exceptions) {
                 MethodVisitor delegate = super.visitMethod(
                         access, name, descriptor, signature, exceptions);
+                if ("run".equals(name) && "()V".equals(descriptor)) {
+                    return new MethodVisitor(Opcodes.ASM9, delegate) {
+                        @Override
+                        public void visitMethodInsn(int opcode, String owner, String methodName,
+                                String methodDescriptor, boolean isInterface) {
+                            if (opcode == Opcodes.INVOKESTATIC && "org/lwjgl/input/Keyboard".equals(owner)
+                                    && "isKeyDown".equals(methodName) && "(I)Z".equals(methodDescriptor)) {
+                                super.visitMethodInsn(opcode, GUI_MANAGER, "isGameplayKeyDown", methodDescriptor, false);
+                            } else {
+                                super.visitMethodInsn(opcode, owner, methodName, methodDescriptor, isInterface);
+                            }
+                        }
+                    };
+                }
                 if ("pick".equals(name) && "(F)V".equals(descriptor)) {
                     writeCpuPick(delegate);
                     pickingPatched[0] = true;

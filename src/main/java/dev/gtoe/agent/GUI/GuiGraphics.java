@@ -71,6 +71,10 @@ final class GuiGraphics {
     static void drawItemIcon(int itemId, int count, int x, int y, int size) {
         int inset = Math.max(3, size / 6);
         float[] color = itemColor(itemId);
+        if (size < 12) {
+            fillRect(x + 1, y + 1, size - 2, size - 2, color[0], color[1], color[2], 1);
+            return;
+        }
         fillRect(x + inset, y + inset, size - inset * 2, size - inset * 2,
                 color[0] * 0.55f, color[1] * 0.55f, color[2] * 0.55f, 1.0f);
 
@@ -160,6 +164,9 @@ final class GuiGraphics {
 
     private static int[] glyph(char character) {
         switch (character) {
+            case '-': return rows(0, 0, 0, 31, 0, 0, 0);
+            case '.': return rows(0, 0, 0, 0, 0, 0, 4);
+            case '/': return rows(1, 1, 2, 4, 8, 16, 16);
             case ':': return rows(0, 4, 4, 0, 4, 4, 0);
             case '!': return rows(4, 4, 4, 4, 4, 0, 4);
             case 'A': return rows(14, 17, 17, 31, 17, 17, 17);

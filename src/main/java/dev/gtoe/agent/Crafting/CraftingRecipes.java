@@ -2,6 +2,7 @@ package dev.gtoe.agent;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /** All crafting recipes used by both 2x2 and 3x3 tables. */
@@ -230,6 +231,39 @@ public final class CraftingRecipes {
         return noRecipe();
     }
 
+    /** Recipe-book entries come from the same registrations as actual crafting. */
+    static synchronized List<BookRecipe> bookRecipes(int gridWidth) {
+        if (gridWidth != 2 && gridWidth != 3) {
+            throw new IllegalArgumentException("Crafting grids must be 2x2 or 3x3");
+        }
+        List<BookRecipe> entries = new ArrayList<>();
+        for (Recipe recipe : RECIPES) {
+            int[] grid = recipe.gridFor(gridWidth);
+            if (grid != null) {
+                entries.add(new BookRecipe(recipe.outputItemId, recipe.outputAmount,
+                        recipe instanceof ShapelessRecipe, grid));
+            }
+        }
+        return Collections.unmodifiableList(entries);
+    }
+
+    /** Immutable description; the returned grid is safe for previewing or filling. */
+    static final class BookRecipe {
+        final int outputItemId;
+        final int outputAmount;
+        final boolean shapeless;
+        private final int[] grid;
+
+        private BookRecipe(int outputItemId, int outputAmount, boolean shapeless, int[] grid) {
+            this.outputItemId = outputItemId;
+            this.outputAmount = outputAmount;
+            this.shapeless = shapeless;
+            this.grid = grid.clone();
+        }
+
+        int[] grid() { return grid.clone(); }
+    }
+
     private static int[] asThreeByThree(int[] grid) {
         if (grid == null)
             return null;
@@ -287,6 +321,7 @@ public final class CraftingRecipes {
         }
 
         abstract boolean matches(int[] fullGrid);
+        abstract int[] gridFor(int width);
     }
 
     private static final class ShapedRecipe extends Recipe {
@@ -371,6 +406,17 @@ public final class CraftingRecipes {
         }
 
         @Override
+        int[] gridFor(int width) {
+            if (shapeWidth > width || shapeHeight > width) { return null; }
+            int[] grid = new int[width * width];
+            Arrays.fill(grid, Inventory.EMPTY_ITEM_ID);
+            for (int row = 0; row < shapeHeight; row++) {
+                System.arraycopy(shape, row * shapeWidth, grid, row * width, shapeWidth);
+            }
+            return grid;
+        }
+
+        @Override
         boolean matches(int[] fullGrid) {
             for (int startRow = 0; startRow <= 3 - shapeHeight; startRow++) {
                 for (int startColumn = 0; startColumn <= 3 - shapeWidth; startColumn++) {
@@ -405,6 +451,15 @@ public final class CraftingRecipes {
         private ShapelessRecipe(int outputItemId, int outputAmount, int[] ingredients) {
             super(outputItemId, outputAmount);
             this.ingredients = Arrays.copyOf(ingredients, ingredients.length);
+        }
+
+        @Override
+        int[] gridFor(int width) {
+            if (ingredients.length > width * width) { return null; }
+            int[] grid = new int[width * width];
+            Arrays.fill(grid, Inventory.EMPTY_ITEM_ID);
+            System.arraycopy(ingredients, 0, grid, 0, ingredients.length);
+            return grid;
         }
 
         @Override

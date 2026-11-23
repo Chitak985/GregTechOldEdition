@@ -62,6 +62,7 @@ public final class InstalledGameVerification {
         final boolean[] playerRestoreFound = {false};
         final int[] filteredMouseDeltas = {0};
         final int[] originalSetTileCalls = {0};
+        final int[] guiAwareExitPolls = {0};
         new ClassReader(bytecode).accept(new ClassVisitor(Opcodes.ASM9) {
             @Override
             public MethodVisitor visitMethod(
@@ -81,6 +82,10 @@ public final class InstalledGameVerification {
                     public void visitMethodInsn(
                             int opcode, String owner, String methodName, String methodDescriptor,
                             boolean isInterface) {
+                        if ("run".equals(name) && "isGameplayKeyDown".equals(methodName)
+                                && "dev/gtoe/agent/GuiManager".equals(owner)) {
+                            guiAwareExitPolls[0]++;
+                        }
                         if ("init".equals(name) && "dev/gtoe/agent/PlayerPersistence".equals(owner)
                                 && "initialize".equals(methodName)
                                 && "(Ljava/lang/Object;Ljava/lang/Object;)V".equals(methodDescriptor)) {
@@ -152,6 +157,7 @@ public final class InstalledGameVerification {
             }
         }, 0);
         require(messageFound[0], "RubyDung.init()V does not contain the injected message");
+        require(guiAwareExitPolls[0] == 1, "Escape-to-exit polling must respect an open GUI");
         require(playerRestoreFound[0], "RubyDung.init must restore the player's saved inventory and position");
         require(keyboardSelectionFound[0], "RubyDung does not forward number-key events");
         require(selectedPlacementFound[0], "RubyDung placement does not use the selected block ID");
